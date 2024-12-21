@@ -1,5 +1,6 @@
 use std::ffi::c_int;
 use std::time::Instant;
+
 use seedcracker::check_seed;
 use seedcracker::random::mth::get_mask;
 

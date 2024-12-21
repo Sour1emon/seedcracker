@@ -11,5 +11,5 @@ pub enum Item {
     IronSword,
     CookedCod,
     CookedSalmon,
-    Empty
+    Empty,
 }

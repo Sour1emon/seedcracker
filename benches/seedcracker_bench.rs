@@ -1,4 +1,4 @@
-use criterion::{BatchSize, black_box, Criterion, criterion_group, criterion_main};
+use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
 use rand::Rng;
 
 use seedcracker::check_seed;

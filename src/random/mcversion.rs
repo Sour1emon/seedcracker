@@ -1,6 +1,7 @@
-use lazy_static::lazy_static;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+
+use lazy_static::lazy_static;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MCVersion {
@@ -113,8 +114,7 @@ impl PartialOrd for MCVersion {
 
 impl Ord for MCVersion {
     fn cmp(&self, other: &Self) -> Ordering {
-        self
-            .release
+        self.release
             .cmp(&other.release)
             .then_with(|| other.sub_version.cmp(&self.sub_version))
     }

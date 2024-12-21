@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+arrayvec = "0.7.6"
 lazy_static = "1.5.0"
-rug = "1.26.1"
 snmalloc-rs = "0.3.7"
 
 [profile.dev]
@@ -14,3 +14,14 @@ overflow-checks = false
 
 [profile.release]
 debug = true
+codegen-units = 1
+lto = true
+
+
+[dev-dependencies]
+criterion = "0.5.1"
+rand = "0.8.5"
+
+[[bench]]
+name = "seedcracker_bench"
+harness = false

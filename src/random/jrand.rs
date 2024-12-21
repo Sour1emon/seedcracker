@@ -1,7 +1,3 @@
-use crate::random::mth::*;
-use rug::{Complete, Integer};
-use std::ops::Shl;
-
 #[derive(Debug, Copy, Clone)]
 pub struct JRand {
     lcg: LCG,
@@ -91,13 +87,13 @@ impl JRand {
     }
 
     pub fn get_next_int(&mut self) -> i32 {
-        self.next(32) as i32
+        self.next(32)
     }
 
     pub fn get_next_int_bound(&mut self, bound: i32) -> i32 {
-        if bound <= 0 {
-            panic!("bound must be positive");
-        }
+        let m = bound - 1;
+
+        debug_assert!(bound >= 0);
 
         if (bound & -bound) == bound {
             return ((bound as i64 * self.next(31) as i64) >> 31) as i32;
@@ -107,9 +103,9 @@ impl JRand {
         let mut value: i32;
 
         loop {
-            bits = self.next(31) as i32;
+            bits = self.next(31);
             value = bits % bound;
-            if bits - value + (bound - 1) >= 0 {
+            if bits - value + m >= 0 {
                 break;
             }
         }
@@ -333,58 +329,58 @@ impl LCG {
         self.combine_steps(-1)
     }
 
-    pub fn distance(&self, seed1: i64, seed2: i64) -> i64 {
-        if DiscreteLog::supports(*self) {
-            let a_from_zero = DiscreteLog::distance_from_zero(*self, seed1);
-            let b_from_zero = DiscreteLog::distance_from_zero(*self, seed2);
-            mask_signed(b_from_zero - a_from_zero, self.trailing_zeros)
-        } else {
-            panic!("DiscreteLog is not supported by this LCG")
-        }
-    }
+    // pub fn distance(&self, seed1: i64, seed2: i64) -> i64 {
+    //     if DiscreteLog::supports(*self) {
+    //         let a_from_zero = DiscreteLog::distance_from_zero(*self, seed1);
+    //         let b_from_zero = DiscreteLog::distance_from_zero(*self, seed2);
+    //         mask_signed(b_from_zero - a_from_zero, self.trailing_zeros)
+    //     } else {
+    //         panic!("DiscreteLog is not supported by this LCG")
+    //     }
+    // }
 }
 
-struct DiscreteLog;
+//struct DiscreteLog;
 
-impl DiscreteLog {
-    fn supports(lcg: LCG) -> bool {
-        if lcg.is_power_of_two || lcg.trailing_zeros > 61 {
-            return false;
-        };
-        lcg.multiplier % 2 != 0 && lcg.addend % 2 != 0
-    }
-
-    fn distance_from_zero(lcg: LCG, seed: i64) -> i64 {
-        let exp = lcg.trailing_zeros;
-
-        let a = lcg.multiplier;
-        let b = mask(
-            seed * (lcg.multiplier - 1) * mod_inverse(lcg.addend, exp) + 1,
-            exp + 2,
-        );
-        let a_bar = Self::theta(a, exp);
-        let b_bar = Self::theta(b, exp);
-        b_bar * mask(mod_inverse(a_bar, exp), exp)
-    }
-
-    fn theta(mut number: i64, exp: i32) -> i64 {
-        if number % 4 == 3 {
-            number = (1_i64 << (exp + 2)) - number;
-        }
-
-        let mut x_hat = Integer::from(number);
-        x_hat = x_hat
-            .pow_mod(
-                &Integer::ONE.shl(exp + 1).complete(),
-                &Integer::ONE.shl(2 * exp + 3).complete(),
-            )
-            .unwrap();
-        x_hat -= Integer::ONE;
-        x_hat /= Integer::ONE.shl(exp + 3).complete();
-        x_hat %= Integer::ONE.shl(exp).complete();
-        x_hat.to_i64().unwrap()
-    }
-}
+// impl DiscreteLog {
+//     fn supports(lcg: LCG) -> bool {
+//         if lcg.is_power_of_two || lcg.trailing_zeros > 61 {
+//             return false;
+//         };
+//         lcg.multiplier % 2 != 0 && lcg.addend % 2 != 0
+//     }
+//
+//     fn distance_from_zero(lcg: LCG, seed: i64) -> i64 {
+//         let exp = lcg.trailing_zeros;
+//
+//         let a = lcg.multiplier;
+//         let b = mask(
+//             seed * (lcg.multiplier - 1) * mod_inverse(lcg.addend, exp) + 1,
+//             exp + 2,
+//         );
+//         let a_bar = Self::theta(a, exp);
+//         let b_bar = Self::theta(b, exp);
+//         b_bar * mask(mod_inverse(a_bar, exp), exp)
+//     }
+//
+//     fn theta(mut number: i64, exp: i32) -> i64 {
+//         if number % 4 == 3 {
+//             number = (1_i64 << (exp + 2)) - number;
+//         }
+//
+//         let mut x_hat = Integer::from(number);
+//         x_hat = x_hat
+//             .pow_mod(
+//                 &Integer::ONE.shl(exp + 1).complete(),
+//                 &Integer::ONE.shl(2 * exp + 3).complete(),
+//             )
+//             .unwrap();
+//         x_hat -= Integer::ONE;
+//         x_hat /= Integer::ONE.shl(exp + 3).complete();
+//         x_hat %= Integer::ONE.shl(exp).complete();
+//         x_hat.to_i64().unwrap()
+//     }
+// }
 
 mod tests {
     use crate::random::jrand::JRand;
@@ -434,7 +430,7 @@ mod tests {
         rand.shuffle(&mut vec);
         assert_eq!(
             vec,
-            [5, 9, 10, 4, 3, 1, 17, 11, 6, 14, 12, 7, 15, 16, 8, 13, 2, 18]
+            [7, 11, 5, 15, 10, 17, 8, 18, 4, 14, 12, 2, 1, 3, 13, 6, 16, 9]
         )
     }
 

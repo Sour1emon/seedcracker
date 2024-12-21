@@ -147,7 +147,7 @@ fn shuffle_items(rand: &mut ChunkRand, items: Vec<ItemStack>) -> Vec<ItemStack> 
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
         25, 26,
     ];
-    rand.shuffle_test(&mut container);
+    rand.shuffle(&mut container);
     let mut list: Vec<ItemStack> = Vec::with_capacity(27);
     let mut new_items: Vec<ItemStack> = Vec::with_capacity(27);
     let size = 27;

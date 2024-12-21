@@ -78,19 +78,17 @@ impl JRand {
             + Self::DOUBLE_UNIT
     }
 
-    pub fn next(&mut self, bits: i32) -> i32 {
-        self.next_bits(bits) as i32
+    #[inline(always)]
+    pub const fn next(&mut self, bits: i32) -> i32 {
+        self.seed = (self.seed * 0x5deece66d + 0xb) & ((1_u64 << 48) - 1) as i64;
+        (self.seed >> (48 - bits)) as i32
     }
 
-    pub fn get_next_bool(&mut self) -> bool {
+    pub const fn get_next_bool(&mut self) -> bool {
         self.next(1) == 1
     }
 
-    pub fn get_next_int(&mut self) -> i32 {
-        self.next(32)
-    }
-
-    pub fn get_next_int_bound(&mut self, bound: i32) -> i32 {
+    pub const fn get_next_int_bound_fast(&mut self, bound: i32) -> i32 {
         let m = bound - 1;
 
         debug_assert!(bound >= 0);
@@ -113,69 +111,55 @@ impl JRand {
         value
     }
 
-    pub fn get_next_float(&mut self) -> f32 {
+    #[inline(always)]
+    pub const fn get_next_int_bound(&mut self, n: i32) -> i32 {
+        let m = n - 1;
+
+        debug_assert!(n >= 0);
+
+        if (m & n) == 0 {
+            let x = n as i64 * self.next(31) as i64;
+            return (x >> 31) as i32;
+        }
+
+        let mut bits: i32;
+        let mut value: i32;
+
+        loop {
+            bits = self.next(31);
+            value = bits % n;
+            if bits - value + m >= 0 {
+                break;
+            }
+        }
+
+        value
+    }
+
+    #[inline(always)]
+    pub const fn get_next_float(&mut self) -> f32 {
         self.next(24) as f32 / (1 << 24) as f32
     }
 
-    pub fn get_next_long(&mut self) -> i64 {
+    #[inline(always)]
+    pub const fn get_next_long(&mut self) -> i64 {
         ((self.next(32) as i64) << 32) + self.next(32) as i64
     }
 
-    pub fn get_next_double(&mut self) -> f64 {
+    #[inline(always)]
+    pub const fn get_next_double(&mut self) -> f64 {
         (((self.next(26) as i64) << 27) + self.next(27) as i64) as f64 * Self::DOUBLE_UNIT
     }
 
-    pub fn next_gaussian(&mut self) -> f64 {
-        if self.have_next_next_gaussian {
-            self.have_next_next_gaussian = false;
-            self.next_next_gaussian
-        } else {
-            let mut v1: f64;
-            let mut v2: f64;
-            let mut s: f64;
-
-            loop {
-                v1 = 2.0 * self.get_next_double() - 1.0;
-                v2 = 2.0 * self.get_next_double() - 1.0;
-                s = v1 * v1 + v2 * v2;
-                if !(s >= 1.0 || s == 0.0) {
-                    break;
-                }
-            }
-
-            let multiplier = (-2.0 * s.ln() / s).sqrt();
-            self.next_next_gaussian = v2 * multiplier;
-            self.have_next_next_gaussian = true;
-            v1 * multiplier
-        }
-    }
-
-    pub fn shuffle_clone<T: Clone>(&mut self, vec: &mut [T]) {
-        let size = vec.len();
-        let mut list = vec![];
-        list.extend_from_slice(vec);
-        for i in (1..size).rev() {
-            list.swap(i - 1, self.get_next_int_bound(i as i32) as usize)
-        }
-        for (i, t) in list.iter().enumerate() {
-            vec[i] = t.clone();
-        }
-    }
-
-    pub fn shuffle<T: Copy>(&mut self, vec: &mut [T]) {
+    #[inline(always)]
+    pub fn shuffle<T>(&mut self, vec: &mut [T]) {
         let size = vec.len();
         for i in (2..=size).rev() {
             vec.swap(i - 1, self.get_next_int_bound(i as i32) as usize);
         }
     }
 
-    pub fn shuffle_test<T>(&mut self, list: &mut [T]) {
-        let size = list.len();
-        for i in (2..=size).rev() {
-            list.swap(i - 1, self.get_next_int_bound(i as i32) as usize);
-        }
-    }
-
+    #[inline(always)]
     pub const fn set_seed(&mut self, seed: i64, scramble: bool) {
         self.seed = if scramble {
             seed ^ LCG::JAVA.multiplier
@@ -184,12 +168,14 @@ impl JRand {
         };
     }
 
+    #[inline(always)]
     pub fn next_seed(&mut self) -> i64 {
         let next = self.lcg.next_seed(self.seed);
         self.seed = next;
         next
     }
 
+    #[inline(always)]
     pub fn next_bits(&mut self, bits: i32) -> i64 {
         self.seed = self.next_seed();
 
@@ -204,13 +190,13 @@ impl JRand {
         self.advance(self.lcg.combine_steps(calls))
     }
 
-    pub fn advance(&mut self, skip: LCG) {
+    fn advance(&mut self, skip: LCG) {
         self.seed = skip.next_seed(self.seed);
     }
 }
 
 #[derive(Debug, Copy, Clone)]
-struct LCG {
+pub struct LCG {
     multiplier: i64,
     addend: i64,
     modulus: i64,
@@ -219,7 +205,7 @@ struct LCG {
 }
 
 const fn is_power_of_two(value: i64) -> bool {
-    (value & -value) == value
+    (-value & value) == value
 }
 
 impl LCG {
@@ -274,6 +260,7 @@ impl LCG {
         lcg
     }
 
+    #[inline(always)]
     pub fn mod_(&self, n: i64) -> i64 {
         if self.is_power_of_two {
             return n & (self.modulus - 1);
@@ -321,10 +308,29 @@ impl LCG {
         )
     }
 
-    pub fn next_seed(&self, seed: i64) -> i64 {
-        self.mod_(seed * self.multiplier + self.addend)
+    #[inline(always)]
+    pub const fn next_seed(&self, mut seed: i64) -> i64 {
+        let mut m = 1;
+        let mut a = 0;
+        let mut im = LCG::JAVA.multiplier;
+        let mut ia = LCG::JAVA.addend;
+        let mut k = 1;
+
+        while k != 0 {
+            if (k & 1) != 0 {
+                m *= im;
+                a = im * a + ia;
+            }
+            ia *= im + 1;
+            im *= im;
+            k >>= 1;
+        }
+
+        seed = seed * m + a;
+        seed & 0xffffffffffff
     }
 
+    #[inline(always)]
     pub fn invert(&self) -> LCG {
         self.combine_steps(-1)
     }
@@ -386,12 +392,6 @@ mod tests {
     use crate::random::jrand::JRand;
 
     #[test]
-    fn test_next_int() {
-        let mut rand = JRand::new(4506419895);
-        assert_eq!(rand.get_next_int(), -4);
-    }
-
-    #[test]
     fn test_next_int_bound() {
         let mut rand = JRand::new(4506419895);
         assert_eq!(rand.get_next_int_bound(100), 10)
@@ -438,11 +438,5 @@ mod tests {
     fn test_next_long() {
         let mut rand = JRand::new(4506419895);
         assert_eq!(rand.get_next_long(), -16256950163)
-    }
-
-    #[test]
-    fn test_next_gaussian() {
-        let mut rand = JRand::new(4506419895);
-        assert!((rand.next_gaussian() - (-0.1851115908371161)).abs() < f64::EPSILON);
     }
 }

@@ -1,5 +1,6 @@
-use crate::random::chunkrand::ChunkRand;
 use std::sync::Mutex;
+
+use crate::random::chunkrand::ChunkRand;
 
 pub struct RegionSeed;
 
@@ -11,7 +12,7 @@ impl RegionSeed {
         Self::A * d_region_x as i64 + Self::B * d_region_z as i64
     }
 
-    pub fn to_world_seed(region_seed: i64, region_x: i32, region_z: i32, salt: i32) -> i64 {
+    pub fn convert_to_world_seed(region_seed: i64, region_x: i32, region_z: i32, salt: i32) -> i64 {
         Self::translate(region_seed, region_x, region_z) - salt as i64
     }
 

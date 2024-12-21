@@ -1,8 +1,9 @@
+use std::ops::{Deref, DerefMut};
+
 use crate::random::jrand::JRand;
 use crate::random::mcversion::{MCVersion, V1_13};
 use crate::random::mth::MASK_48;
 use crate::random::seeds::{PositionSeed, RegionSeed};
-use std::ops::{Deref, DerefMut};
 
 #[derive(Debug)]
 pub struct ChunkRand {

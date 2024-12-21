@@ -13,12 +13,20 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             BatchSize::SmallInput,
         )
     });
-    c.bench_function("rand_int", |b| {
+    let mut group = c.benchmark_group("Next Int Bound");
+    group.bench_function("next_seed", |b| {
         let mut rand = ChunkRand::default();
         b.iter(|| {
-            rand.get_next_int();
-        })
-    })
+            black_box(rand.next_seed());
+        });
+    });
+    group.bench_function("next_seed_fast", |b| {
+        let mut rand = ChunkRand::default();
+        b.iter(|| {
+            black_box(rand.next_seed_fast());
+        });
+    });
+    group.finish();
 }
 
 criterion_group!(benches, criterion_benchmark);

@@ -13,3 +13,9 @@ pub enum Item {
     CookedSalmon,
     Empty,
 }
+
+impl Item {
+    pub const fn equals(&self, other: &Item) -> bool {
+        *self as isize == *other as isize
+    }
+}

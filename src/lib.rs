@@ -1,59 +1,37 @@
-use crate::items::Item;
-use crate::items::Item::*;
+#![feature(const_trait_impl, derive_const)]
+
+use std::mem::MaybeUninit;
+
+use arrayvec::copy::ArrayVecCopy;
+use const_for::const_for;
+use static_assertions::const_assert_eq;
+
+use crate::item::Item;
+use crate::item::Item::*;
 use crate::random::chunkrand::ChunkRand;
 use crate::random::mcversion::MCVersion;
 
 #[global_allocator]
 static ALLOCATOR: snmalloc_rs::SnMalloc = snmalloc_rs::SnMalloc;
 
-pub mod items;
+pub mod item;
 pub mod random;
 
+pub type InventoryVec<T> = ArrayVecCopy<T, 27>;
+
 pub fn check_seed(seed: u64, chunk_x: i32, chunk_z: i32) -> bool {
-    if get_loot(
+    get_loot(
         i64::from_be_bytes(seed.to_be_bytes()),
         chunk_x,
         chunk_z,
         true,
         *MCVersion::latest(),
-    ) == TARGET_ITEMS
-    {
-        return true;
-    };
-
-    false
+    )
+    .map(|x| x == TARGET_ITEMS)
+    .unwrap_or(false)
 }
 
-const TARGET_ITEMS: [ItemStack; 27] = [
-    ItemStack(LeatherChestplate, 1),
-    ItemStack(IronIngot, 2),
-    ItemStack(IronIngot, 1),
-    ItemStack(GoldIngot, 1),
-    ItemStack(GoldIngot, 1),
-    ItemStack(CookedCod, 1),
-    ItemStack(Empty, 0),
-    ItemStack(IronIngot, 1),
-    ItemStack(IronIngot, 1),
-    ItemStack(Diamond, 1),
-    ItemStack(GoldIngot, 1),
-    ItemStack(CookedCod, 2),
-    ItemStack(GoldIngot, 1),
-    ItemStack(Diamond, 1),
-    ItemStack(HeartOfTheSea, 1),
-    ItemStack(CookedSalmon, 1),
-    ItemStack(IronIngot, 1),
-    ItemStack(Emerald, 6),
-    ItemStack(IronIngot, 1),
-    ItemStack(GoldIngot, 1),
-    ItemStack(CookedSalmon, 2),
-    ItemStack(TNT, 1),
-    ItemStack(CookedSalmon, 1),
-    ItemStack(GoldIngot, 1),
-    ItemStack(IronIngot, 1),
-    ItemStack(GoldIngot, 1),
-    ItemStack(Emerald, 1),
-];
-
+#[inline(always)]
 fn get_count(rand: &mut ChunkRand, min: i32, max: i32) -> i32 {
     if min >= max {
         min
@@ -77,17 +55,79 @@ impl ItemStack {
         self.1 -= split_count as usize;
         item_stack
     }
-}
 
-fn get_float(rand: &mut ChunkRand, min: f32, max: f32) -> f32 {
-    if min >= max {
-        min
-    } else {
-        rand.get_next_float() * (max - min) + min
+    const fn is_empty(&self) -> bool {
+        (self.0 as isize) == (Empty as isize) || self.1 == 0
     }
 }
-fn generate_buried_treasure_loot(mut rand: ChunkRand, indexed: bool) -> Vec<ItemStack> {
-    let mut loot = vec![];
+
+// -4872636734044769429
+const TARGET_ITEMS: InventoryVec<ItemStack> = InventoryVec {
+    len: 27,
+    xs: [
+        MaybeUninit::new(ItemStack(LeatherChestplate, 1)),
+        MaybeUninit::new(ItemStack(IronIngot, 2)),
+        MaybeUninit::new(ItemStack(IronIngot, 1)),
+        MaybeUninit::new(ItemStack(GoldIngot, 1)),
+        MaybeUninit::new(ItemStack(GoldIngot, 1)),
+        MaybeUninit::new(ItemStack(CookedCod, 1)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(IronIngot, 1)),
+        MaybeUninit::new(ItemStack(IronIngot, 1)),
+        MaybeUninit::new(ItemStack(Diamond, 1)),
+        MaybeUninit::new(ItemStack(GoldIngot, 1)),
+        MaybeUninit::new(ItemStack(CookedCod, 2)),
+        MaybeUninit::new(ItemStack(GoldIngot, 1)),
+        MaybeUninit::new(ItemStack(Diamond, 1)),
+        MaybeUninit::new(ItemStack(HeartOfTheSea, 1)),
+        MaybeUninit::new(ItemStack(CookedSalmon, 1)),
+        MaybeUninit::new(ItemStack(IronIngot, 1)),
+        MaybeUninit::new(ItemStack(Emerald, 6)),
+        MaybeUninit::new(ItemStack(IronIngot, 1)),
+        MaybeUninit::new(ItemStack(GoldIngot, 1)),
+        MaybeUninit::new(ItemStack(CookedSalmon, 2)),
+        MaybeUninit::new(ItemStack(TNT, 1)),
+        MaybeUninit::new(ItemStack(CookedSalmon, 1)),
+        MaybeUninit::new(ItemStack(GoldIngot, 1)),
+        MaybeUninit::new(ItemStack(IronIngot, 1)),
+        MaybeUninit::new(ItemStack(GoldIngot, 1)),
+        MaybeUninit::new(ItemStack(Emerald, 1)),
+    ],
+};
+
+const HEART_OF_THE_SEA_INDEX: usize = {
+    const_assert_eq!(TARGET_ITEMS.len(), 27);
+    let mut index: Option<usize> = None;
+    const_for!(i in (0..TARGET_ITEMS.len()) => {
+        if unsafe { TARGET_ITEMS.xs[i].assume_init().0 }.equals(&HeartOfTheSea) {
+            index = Some(i);
+            break;
+        }
+    });
+    match index {
+        None => panic!("Invalid loot"),
+        Some(_) => 0,
+    }
+};
+
+const CHESTPLATE_OR_SWORD_INDEX: Option<(usize, Item)> = {
+    const_assert_eq!(TARGET_ITEMS.len(), 27);
+    let mut res: Option<(usize, Item)> = None;
+    const_for!(i in (0..TARGET_ITEMS.len()) => {
+        let item = unsafe { TARGET_ITEMS.xs[i].assume_init() }.0;
+        if item.equals(&LeatherChestplate) || item.equals(&IronSword) {
+            res = Some((i, item));
+            break;
+        }
+    });
+    res
+};
+
+fn generate_buried_treasure_loot(
+    mut rand: ChunkRand,
+    indexed: bool,
+) -> Option<InventoryVec<ItemStack>> {
+    let mut loot = InventoryVec::new();
     loot.push(ItemStack(HeartOfTheSea, 1));
     let rolls = get_count(&mut rand, 5, 8);
     for _ in 0..rolls {
@@ -114,16 +154,33 @@ fn generate_buried_treasure_loot(mut rand: ChunkRand, indexed: bool) -> Vec<Item
             ));
         }
     }
-    let rolls = get_count(&mut rand, 0, 1);
-    if rolls == 1 {
+
+    let should_roll = rand.get_next_bool();
+    if cfg!(feature = "exit-early") && CHESTPLATE_OR_SWORD_INDEX.is_some() != should_roll {
+        return None;
+    }
+    if should_roll {
         let weight = rand.get_next_int_bound(2);
         if weight < 1 {
+            if cfg!(feature = "exit-early")
+                && CHESTPLATE_OR_SWORD_INDEX.unwrap().1.equals(&IronSword)
+            {
+                return None;
+            }
             loot.push(ItemStack(LeatherChestplate, 1))
         } else {
+            if cfg!(feature = "exit-early")
+                && CHESTPLATE_OR_SWORD_INDEX
+                    .unwrap()
+                    .1
+                    .equals(&LeatherChestplate)
+            {
+                return None;
+            }
             loot.push(ItemStack(IronSword, 1))
         }
     }
-    get_float(&mut rand, 0.0, 0.0);
+
     for _ in 0..2 {
         let weight = rand.get_next_int_bound(2);
         if weight < 1 {
@@ -134,20 +191,87 @@ fn generate_buried_treasure_loot(mut rand: ChunkRand, indexed: bool) -> Vec<Item
     }
 
     if indexed {
-        shuffle_items(&mut rand, loot)
+        let mut container = DEFAULT_CONTAINER;
+        rand.shuffle(&mut container);
+        Some(shuffle_items(&mut rand, loot, container))
     } else {
-        loot
+        Some(loot)
     }
 }
 
-fn shuffle_items(rand: &mut ChunkRand, items: Vec<ItemStack>) -> Vec<ItemStack> {
-    let mut container = vec![
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
-        25, 26,
-    ];
-    rand.shuffle(&mut container);
-    let mut list: Vec<ItemStack> = Vec::with_capacity(27);
-    let mut new_items: Vec<ItemStack> = Vec::with_capacity(27);
+const DEFAULT_CONTAINER: InventoryVec<usize> = InventoryVec {
+    len: 27,
+    xs: [
+        MaybeUninit::new(0),
+        MaybeUninit::new(1),
+        MaybeUninit::new(2),
+        MaybeUninit::new(3),
+        MaybeUninit::new(4),
+        MaybeUninit::new(5),
+        MaybeUninit::new(6),
+        MaybeUninit::new(7),
+        MaybeUninit::new(8),
+        MaybeUninit::new(9),
+        MaybeUninit::new(10),
+        MaybeUninit::new(11),
+        MaybeUninit::new(12),
+        MaybeUninit::new(13),
+        MaybeUninit::new(14),
+        MaybeUninit::new(15),
+        MaybeUninit::new(16),
+        MaybeUninit::new(17),
+        MaybeUninit::new(18),
+        MaybeUninit::new(19),
+        MaybeUninit::new(20),
+        MaybeUninit::new(21),
+        MaybeUninit::new(22),
+        MaybeUninit::new(23),
+        MaybeUninit::new(24),
+        MaybeUninit::new(25),
+        MaybeUninit::new(26),
+    ],
+};
+
+const DEFAULT_INVENTORY: InventoryVec<ItemStack> = InventoryVec {
+    len: 27,
+    xs: [
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+        MaybeUninit::new(ItemStack(Empty, 0)),
+    ],
+};
+
+fn shuffle_items(
+    rand: &mut ChunkRand,
+    items: InventoryVec<ItemStack>,
+    container: InventoryVec<usize>,
+) -> InventoryVec<ItemStack> {
+    let mut list = InventoryVec::new();
+    let mut new_items = InventoryVec::new();
     let size = 27;
     for item_stack in items.iter() {
         if item_stack.1 > 1 {
@@ -177,19 +301,17 @@ fn shuffle_items(rand: &mut ChunkRand, items: Vec<ItemStack>) -> Vec<ItemStack> 
         }
     }
 
-    items.append(&mut list);
+    items
+        .try_extend_from_slice(&list)
+        .expect("ArrayVec should have enough capacity");
     rand.shuffle(&mut items);
-    let mut result: Vec<ItemStack> = vec![ItemStack(Empty, 0); 27];
+    let mut result = DEFAULT_INVENTORY;
+    let mut i = container.len();
     for item_stack in &items {
-        if container.is_empty() {
-            return items;
+        if item_stack.0 != Empty {
+            result[*unsafe { container.get_unchecked(i - 1) }] = *item_stack;
         }
-
-        if item_stack.1 == 0 || item_stack.0 == Empty {
-            //result.insert(container.remove(container.len() - 1), ItemStack(Empty, 0));
-        } else {
-            result[container.remove(container.len() - 1)] = *item_stack;
-        }
+        i -= 1;
     }
     result
 }
@@ -200,7 +322,7 @@ fn get_loot(
     chunk_z: i32,
     indexed: bool,
     version: MCVersion,
-) -> Vec<ItemStack> {
+) -> Option<InventoryVec<ItemStack>> {
     let mut rand = ChunkRand::default();
     rand.set_decorator_seed_block_salt(structure_seed, chunk_x * 16, chunk_z * 16, 30001, version);
     let loot_rand = ChunkRand::new(rand.get_next_long());

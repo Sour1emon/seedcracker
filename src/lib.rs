@@ -3,6 +3,9 @@ use crate::items::Item::*;
 use crate::random::chunkrand::ChunkRand;
 use crate::random::mcversion::MCVersion;
 
+#[global_allocator]
+static ALLOCATOR: snmalloc_rs::SnMalloc = snmalloc_rs::SnMalloc;
+
 pub mod items;
 pub mod random;
 
@@ -83,13 +86,10 @@ fn get_float(rand: &mut ChunkRand, min: f32, max: f32) -> f32 {
         rand.get_next_float() * (max - min) + min
     }
 }
-
 fn generate_buried_treasure_loot(mut rand: ChunkRand, indexed: bool) -> Vec<ItemStack> {
     let mut loot = vec![];
-    get_float(&mut rand, 0.0, 0.0);
     loot.push(ItemStack(HeartOfTheSea, 1));
     let rolls = get_count(&mut rand, 5, 8);
-    get_float(&mut rand, 0.0, 0.0);
     for _ in 0..rolls {
         let weight = rand.get_next_int_bound(35);
         if weight < 20 {
@@ -101,7 +101,6 @@ fn generate_buried_treasure_loot(mut rand: ChunkRand, indexed: bool) -> Vec<Item
         }
     }
     let rolls = get_count(&mut rand, 1, 3);
-    get_float(&mut rand, 0.0, 0.0);
     for _ in 0..rolls {
         let weight = rand.get_next_int_bound(15);
         if weight < 5 {
@@ -116,8 +115,7 @@ fn generate_buried_treasure_loot(mut rand: ChunkRand, indexed: bool) -> Vec<Item
         }
     }
     let rolls = get_count(&mut rand, 0, 1);
-    get_float(&mut rand, 0.0, 0.0);
-    for _ in 0..rolls {
+    if rolls == 1 {
         let weight = rand.get_next_int_bound(2);
         if weight < 1 {
             loot.push(ItemStack(LeatherChestplate, 1))

@@ -388,6 +388,7 @@ impl LCG {
 //     }
 // }
 
+#[cfg(test)]
 mod tests {
     use crate::random::jrand::JRand;
 

@@ -4,9 +4,6 @@ use std::time::Instant;
 use seedcracker::check_seed;
 use seedcracker::random::mth::get_mask;
 
-#[global_allocator]
-static ALLOC: snmalloc_rs::SnMalloc = snmalloc_rs::SnMalloc;
-
 fn main() {
     let chunk_x: c_int = -28;
     let chunk_z: c_int = -73;

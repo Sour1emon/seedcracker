@@ -238,6 +238,7 @@ impl ChunkRand {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use crate::random::chunkrand::ChunkRand;
     use crate::random::jrand::JRand;

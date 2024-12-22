@@ -1,6 +1,5 @@
 use seedcracker::random::chunkrand::ChunkRand;
 use seedcracker::random::jrand::JRand;
-use seedcracker::random::mcversion::MCVersion;
 
 #[test]
 fn test_terrain_seed() {
@@ -14,7 +13,7 @@ fn test_population_seed() {
     let rand = JRand::new(4506419895);
     let mut chunk_rand: ChunkRand = rand.into();
     assert_eq!(
-        chunk_rand.set_population_seed(5235023985902385, 234, 256, *MCVersion::latest()),
+        chunk_rand.set_population_seed(5235023985902385, 234, 256),
         72830530974919
     );
 }
@@ -24,7 +23,7 @@ fn test_decorator_seed() {
     let rand = JRand::new(4506419895);
     let mut chunk_rand: ChunkRand = rand.into();
     assert_eq!(
-        chunk_rand.set_decorator_seed_block_salt(571437852345, 10, 25, 5, *MCVersion::latest()),
+        chunk_rand.set_decorator_seed_block_salt(571437852345, 10, 25, 5),
         234602471937219
     );
 }
@@ -34,7 +33,7 @@ fn test_carver_seed() {
     let rand = JRand::new(4506419895);
     let mut chunk_rand: ChunkRand = rand.into();
     assert_eq!(
-        chunk_rand.set_carver_seed(5714378552345, 55, 6, *MCVersion::latest()),
+        chunk_rand.set_carver_seed(5714378552345, 55, 6),
         57433805167245
     );
 }
@@ -44,7 +43,7 @@ fn test_region_seed() {
     let rand = JRand::new(4506419895);
     let mut chunk_rand: ChunkRand = rand.into();
     assert_eq!(
-        chunk_rand.set_region_seed(5714378552345, 55, 6, 53415, *MCVersion::latest()),
+        chunk_rand.set_region_seed(5714378552345, 55, 6, 53415),
         25314788610166
     );
 }
@@ -54,7 +53,7 @@ fn test_weak_seed() {
     let rand = JRand::new(4506419895);
     let mut chunk_rand: ChunkRand = rand.into();
     assert_eq!(
-        chunk_rand.set_weak_seed(7432895798243759, 34, 3, *MCVersion::latest()),
+        chunk_rand.set_weak_seed(7432895798243759, 34, 3),
         114546403766701
     );
 }
@@ -64,7 +63,7 @@ fn test_slime_seed() {
     let rand = JRand::new(4506419895);
     let mut chunk_rand: ChunkRand = rand.into();
     assert_eq!(
-        chunk_rand.set_slime_seed_scramble(7432895798243759, 34, 3, 5555, *MCVersion::latest()),
+        chunk_rand.set_slime_seed_scramble(7432895798243759, 34, 3, 5555),
         114548116864026
     )
 }
@@ -74,7 +73,7 @@ fn test_position_seed() {
     let rand = JRand::new(4506419895);
     let mut chunk_rand: ChunkRand = rand.into();
     assert_eq!(
-        chunk_rand.set_position_seed(555, 54, 1345, *MCVersion::latest()),
+        chunk_rand.set_position_seed(555, 54, 1345),
         27536523298125
     )
 }

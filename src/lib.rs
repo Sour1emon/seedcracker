@@ -1,15 +1,15 @@
 #![feature(const_trait_impl, derive_const)]
+#![allow(dead_code, clippy::inline_always)]
+#![warn(clippy::pedantic, clippy::nursery, clippy::cargo)]
 
 use std::mem::MaybeUninit;
 
 use arrayvec::copy::ArrayVecCopy;
 use const_for::const_for;
-use static_assertions::const_assert_eq;
-
 use crate::item::Item;
 use crate::item::Item::*;
 use crate::random::chunkrand::ChunkRand;
-use crate::random::mcversion::MCVersion;
+use crate::random::mcversion::{MCVersion, V1_16_5};
 
 #[global_allocator]
 static ALLOCATOR: snmalloc_rs::SnMalloc = snmalloc_rs::SnMalloc;
@@ -19,16 +19,16 @@ pub mod random;
 
 pub type InventoryVec<T> = ArrayVecCopy<T, 27>;
 
+pub const MC_VERSION: MCVersion = V1_16_5;
+
 pub fn check_seed(seed: u64, chunk_x: i32, chunk_z: i32) -> bool {
     get_loot(
         i64::from_be_bytes(seed.to_be_bytes()),
         chunk_x,
         chunk_z,
         true,
-        *MCVersion::latest(),
     )
-    .map(|x| x == TARGET_ITEMS)
-    .unwrap_or(false)
+    .is_some_and(|x| x == TARGET_ITEMS)
 }
 
 #[inline(always)]
@@ -121,6 +121,14 @@ const SWORD_COUNT: usize = item_count!(IronSword);
 const COOKED_COD_COUNT: usize = item_count!(CookedCod);
 const COOKED_SALMON_COUNT: usize = item_count!(CookedSalmon);
 
+const EXIT_EARLY: bool = cfg!(feature = "exit-early");
+
+macro_rules! exit_function {
+    () => {
+        return None;
+    };
+}
+
 fn generate_buried_treasure_loot(
     mut rand: ChunkRand,
     indexed: bool,
@@ -134,25 +142,34 @@ fn generate_buried_treasure_loot(
     for _ in 0..rolls {
         let weight = rand.get_next_int_bound(35);
         if weight < 20 {
+            if EXIT_EARLY && IRON_INGOT_COUNT == 0 {
+                exit_function!();
+            }
             let value = get_count(&mut rand, 1, 4) as usize;
             iron_ingot_count += value;
             loot.push(ItemStack(IronIngot, value));
         } else if weight < 30 {
+            if EXIT_EARLY && GOLD_INGOT_COUNT == 0 {
+                exit_function!();
+            }
             let value = get_count(&mut rand, 1, 4) as usize;
             gold_ingot_count += value;
             loot.push(ItemStack(GoldIngot, value));
         } else {
+            if EXIT_EARLY && TNT_COUNT == 0 {
+                exit_function!();
+            }
             let value = get_count(&mut rand, 1, 2) as usize;
             tnt_count += value;
             loot.push(ItemStack(TNT, value));
         }
     }
-    if cfg!(feature = "exit-early")
+    if EXIT_EARLY
         && (iron_ingot_count != IRON_INGOT_COUNT
             || gold_ingot_count != GOLD_INGOT_COUNT
             || tnt_count != TNT_COUNT)
     {
-        return None;
+        exit_function!();
     }
     let rolls = get_count(&mut rand, 1, 3);
     let mut emerald_count = 0;
@@ -161,42 +178,51 @@ fn generate_buried_treasure_loot(
     for _ in 0..rolls {
         let weight = rand.get_next_int_bound(15);
         if weight < 5 {
+            if EXIT_EARLY && EMERALD_COUNT == 0 {
+                exit_function!();
+            }
             let value = get_count(&mut rand, 4, 8) as usize;
             emerald_count += value;
             loot.push(ItemStack(Emerald, value));
         } else if weight < 10 {
+            if EXIT_EARLY && DIAMOND_COUNT == 0 {
+                exit_function!();
+            }
             let value = get_count(&mut rand, 1, 2) as usize;
             diamond_count += value;
             loot.push(ItemStack(Diamond, value));
         } else {
+            if EXIT_EARLY && PRISMARINE_COUNT == 0 {
+                exit_function!();
+            }
             let value = get_count(&mut rand, 1, 5) as usize;
             prismarine_count += value;
             loot.push(ItemStack(PrismarineCrystals, value));
         }
     }
 
-    if cfg!(feature = "exit-early")
+    if EXIT_EARLY
         && (emerald_count != EMERALD_COUNT
             || diamond_count != DIAMOND_COUNT
             || prismarine_count != PRISMARINE_COUNT)
     {
-        return None;
+        exit_function!();
     }
 
     let should_roll = rand.get_next_bool();
-    if cfg!(feature = "exit-early") && (CHESTPLATE_COUNT != 0 || SWORD_COUNT != 0) != should_roll {
-        return None;
+    if EXIT_EARLY && (CHESTPLATE_COUNT != 0 || SWORD_COUNT != 0) != should_roll {
+        exit_function!();
     }
     if should_roll {
         let weight = rand.get_next_int_bound(2);
         if weight < 1 {
-            if cfg!(feature = "exit-early") && CHESTPLATE_COUNT != 1 {
-                return None;
+            if EXIT_EARLY && CHESTPLATE_COUNT == 0 {
+                exit_function!();
             }
             loot.push(ItemStack(LeatherChestplate, 1))
         } else {
-            if cfg!(feature = "exit-early") && SWORD_COUNT != 1 {
-                return None;
+            if EXIT_EARLY && SWORD_COUNT == 0 {
+                exit_function!();
             }
             loot.push(ItemStack(IronSword, 1))
         }
@@ -208,20 +234,26 @@ fn generate_buried_treasure_loot(
     for _ in 0..2 {
         let weight = rand.get_next_int_bound(2);
         if weight < 1 {
+            if EXIT_EARLY && COOKED_COD_COUNT == 0 {
+                exit_function!();
+            }
             let value = get_count(&mut rand, 2, 4) as usize;
             cooked_cod_count += value;
-            loot.push(ItemStack(CookedCod, get_count(&mut rand, 2, 4) as usize));
+            loot.push(ItemStack(CookedCod, value));
         } else {
+            if EXIT_EARLY && COOKED_SALMON_COUNT == 0 {
+                exit_function!();
+            }
             let value = get_count(&mut rand, 2, 4) as usize;
             cooked_salmon_count += value;
-            loot.push(ItemStack(CookedSalmon, get_count(&mut rand, 2, 4) as usize));
+            loot.push(ItemStack(CookedSalmon, value));
         }
     }
 
-    if cfg!(feature = "exit-early")
+    if EXIT_EARLY
         && (cooked_cod_count != COOKED_COD_COUNT || cooked_salmon_count != COOKED_SALMON_COUNT)
     {
-        return None;
+        exit_function!();
     }
 
     if indexed {
@@ -354,10 +386,9 @@ fn get_loot(
     chunk_x: i32,
     chunk_z: i32,
     indexed: bool,
-    version: MCVersion,
 ) -> Option<InventoryVec<ItemStack>> {
     let mut rand = ChunkRand::default();
-    rand.set_decorator_seed_block_salt(structure_seed, chunk_x * 16, chunk_z * 16, 30001, version);
+    rand.set_decorator_seed_block_salt(structure_seed, chunk_x * 16, chunk_z * 16, 30001);
     let loot_rand = ChunkRand::new(rand.get_next_long());
     generate_buried_treasure_loot(loot_rand, indexed)
 }

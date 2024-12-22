@@ -11,6 +11,7 @@ exit-early = []
 arrayvec = { path = "arrayvec" }
 const_for = "0.1.5"
 lazy_static = "1.5.0"
+rs-abbreviation-number = "0.3.2"
 snmalloc-rs = { version = "0.3.7", features = ["native-cpu", "lto"] }
 static_assertions = "1.1.0"
 

@@ -1,7 +1,8 @@
 use std::ops::{Deref, DerefMut};
 
+use crate::MC_VERSION;
 use crate::random::jrand::JRand;
-use crate::random::mcversion::{MCVersion, V1_13};
+use crate::random::mcversion::V1_13;
 use crate::random::mth::MASK_48;
 use crate::random::seeds::{PositionSeed, RegionSeed};
 
@@ -57,18 +58,12 @@ impl ChunkRand {
         seed & MASK_48
     }
 
-    pub fn set_population_seed(
-        &mut self,
-        world_seed: i64,
-        x: i32,
-        z: i32,
-        version: MCVersion,
-    ) -> i64 {
+    pub fn set_population_seed(&mut self, world_seed: i64, x: i32, z: i32) -> i64 {
         self.set_seed(world_seed, true);
         let a: i64;
         let b: i64;
 
-        if version.is_older_than(&V1_13) {
+        if MC_VERSION.is_older_than(&V1_13) {
             a = (self.get_next_long() / 2) * 2 + 1;
             b = self.get_next_long() / 2 * 2 + 1;
         } else {
@@ -91,19 +86,13 @@ impl ChunkRand {
         population_seed: i64,
         index: i32,
         step: i32,
-        version: MCVersion,
     ) -> i64 {
-        self.set_decorator_seed(population_seed, index + 10000 * step, version)
+        self.set_decorator_seed(population_seed, index + 10000 * step)
     }
 
-    pub fn set_decorator_seed(
-        &mut self,
-        population_seed: i64,
-        salt: i32,
-        version: MCVersion,
-    ) -> i64 {
-        if version.is_older_than(&V1_13) {
-            panic!("Unsupported version: {}", version)
+    pub fn set_decorator_seed(&mut self, population_seed: i64, salt: i32) -> i64 {
+        if MC_VERSION.is_older_than(&V1_13) {
+            panic!("Unsupported version: {}", MC_VERSION)
         }
 
         let seed = population_seed + salt as i64;
@@ -118,10 +107,9 @@ impl ChunkRand {
         block_z: i32,
         index: i32,
         step: i32,
-        version: MCVersion,
     ) -> i64 {
-        let population_seed = self.set_population_seed(world_seed, block_x, block_z, version);
-        self.set_decorator_seed_with_index(population_seed, index, step, version)
+        let population_seed = self.set_population_seed(world_seed, block_x, block_z);
+        self.set_decorator_seed_with_index(population_seed, index, step)
     }
 
     pub fn set_decorator_seed_block_salt(
@@ -130,19 +118,12 @@ impl ChunkRand {
         block_x: i32,
         block_z: i32,
         salt: i32,
-        version: MCVersion,
     ) -> i64 {
-        let population_seed = self.set_population_seed(world_seed, block_x, block_z, version);
-        self.set_decorator_seed(population_seed, salt, version)
+        let population_seed = self.set_population_seed(world_seed, block_x, block_z);
+        self.set_decorator_seed(population_seed, salt)
     }
 
-    pub fn set_carver_seed(
-        &mut self,
-        world_seed: i64,
-        chunk_x: i32,
-        chunk_z: i32,
-        _version: MCVersion,
-    ) -> i64 {
+    pub fn set_carver_seed(&mut self, world_seed: i64, chunk_x: i32, chunk_z: i32) -> i64 {
         self.set_seed(world_seed, true);
         let a = self.get_next_long();
         let b = self.get_next_long();
@@ -157,7 +138,6 @@ impl ChunkRand {
         region_x: i32,
         region_z: i32,
         salt: i32,
-        _version: MCVersion,
     ) -> i64 {
         let seed = region_x as i64 * RegionSeed::A
             + region_z as i64 * RegionSeed::B
@@ -167,13 +147,7 @@ impl ChunkRand {
         seed & MASK_48
     }
 
-    pub fn set_weak_seed(
-        &mut self,
-        world_seed: i64,
-        chunk_x: i32,
-        chunk_z: i32,
-        _version: MCVersion,
-    ) -> i64 {
+    pub fn set_weak_seed(&mut self, world_seed: i64, chunk_x: i32, chunk_z: i32) -> i64 {
         let sx = chunk_x >> 4;
         let sz = chunk_z >> 4;
         let seed = (sx ^ sz << 4) as i64 ^ world_seed;
@@ -187,7 +161,6 @@ impl ChunkRand {
         chunk_x: i32,
         chunk_z: i32,
         scrambler: i64,
-        _version: MCVersion,
     ) -> i64 {
         let seed = (world_seed
             + (chunk_x * chunk_x * 4987142) as i64
@@ -199,17 +172,11 @@ impl ChunkRand {
         seed & MASK_48
     }
 
-    pub fn set_slime_seed(
-        &mut self,
-        world_seed: i64,
-        chunk_x: i32,
-        chunk_z: i32,
-        _version: MCVersion,
-    ) -> i64 {
-        self.set_slime_seed_scramble(world_seed, chunk_x, chunk_z, 987234911, _version)
+    pub fn set_slime_seed(&mut self, world_seed: i64, chunk_x: i32, chunk_z: i32) -> i64 {
+        self.set_slime_seed_scramble(world_seed, chunk_x, chunk_z, 987234911)
     }
 
-    pub fn set_position_seed(&mut self, x: i32, y: i32, z: i32, _version: MCVersion) -> i64 {
+    pub fn set_position_seed(&mut self, x: i32, y: i32, z: i32) -> i64 {
         let seed = PositionSeed::get_position_seed(x, y, z);
         self.set_seed(seed, true);
         seed & MASK_48

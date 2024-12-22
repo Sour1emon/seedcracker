@@ -95,33 +95,31 @@ const TARGET_ITEMS: InventoryVec<ItemStack> = InventoryVec {
     ],
 };
 
-const HEART_OF_THE_SEA_INDEX: usize = {
-    const_assert_eq!(TARGET_ITEMS.len(), 27);
-    let mut index: Option<usize> = None;
-    const_for!(i in (0..TARGET_ITEMS.len()) => {
-        if unsafe { TARGET_ITEMS.xs[i].assume_init().0 }.equals(&HeartOfTheSea) {
-            index = Some(i);
-            break;
+macro_rules! item_count {
+    ($item:expr) => {
+        {
+            let mut res = 0;
+            const_for!(i in (0..TARGET_ITEMS.len()) => {
+                let item_stack = unsafe { TARGET_ITEMS.xs[i].assume_init() };
+                if item_stack.0.equals(&$item) {
+                    res += item_stack.1;
+                }
+            });
+            res
         }
-    });
-    match index {
-        None => panic!("Invalid loot"),
-        Some(_) => 0,
-    }
-};
+    };
+}
 
-const CHESTPLATE_OR_SWORD_INDEX: Option<(usize, Item)> = {
-    const_assert_eq!(TARGET_ITEMS.len(), 27);
-    let mut res: Option<(usize, Item)> = None;
-    const_for!(i in (0..TARGET_ITEMS.len()) => {
-        let item = unsafe { TARGET_ITEMS.xs[i].assume_init() }.0;
-        if item.equals(&LeatherChestplate) || item.equals(&IronSword) {
-            res = Some((i, item));
-            break;
-        }
-    });
-    res
-};
+const IRON_INGOT_COUNT: usize = item_count!(IronIngot);
+const GOLD_INGOT_COUNT: usize = item_count!(GoldIngot);
+const TNT_COUNT: usize = item_count!(TNT);
+const EMERALD_COUNT: usize = item_count!(Emerald);
+const DIAMOND_COUNT: usize = item_count!(Diamond);
+const PRISMARINE_COUNT: usize = item_count!(PrismarineCrystals);
+const CHESTPLATE_COUNT: usize = item_count!(LeatherChestplate);
+const SWORD_COUNT: usize = item_count!(IronSword);
+const COOKED_COD_COUNT: usize = item_count!(CookedCod);
+const COOKED_SALMON_COUNT: usize = item_count!(CookedSalmon);
 
 fn generate_buried_treasure_loot(
     mut rand: ChunkRand,
@@ -130,70 +128,106 @@ fn generate_buried_treasure_loot(
     let mut loot = InventoryVec::new();
     loot.push(ItemStack(HeartOfTheSea, 1));
     let rolls = get_count(&mut rand, 5, 8);
+    let mut iron_ingot_count = 0;
+    let mut gold_ingot_count = 0;
+    let mut tnt_count = 0;
     for _ in 0..rolls {
         let weight = rand.get_next_int_bound(35);
         if weight < 20 {
-            loot.push(ItemStack(IronIngot, get_count(&mut rand, 1, 4) as usize));
+            let value = get_count(&mut rand, 1, 4) as usize;
+            iron_ingot_count += value;
+            loot.push(ItemStack(IronIngot, value));
         } else if weight < 30 {
-            loot.push(ItemStack(GoldIngot, get_count(&mut rand, 1, 4) as usize));
+            let value = get_count(&mut rand, 1, 4) as usize;
+            gold_ingot_count += value;
+            loot.push(ItemStack(GoldIngot, value));
         } else {
-            loot.push(ItemStack(TNT, get_count(&mut rand, 1, 2) as usize));
+            let value = get_count(&mut rand, 1, 2) as usize;
+            tnt_count += value;
+            loot.push(ItemStack(TNT, value));
         }
     }
+    if cfg!(feature = "exit-early")
+        && (iron_ingot_count != IRON_INGOT_COUNT
+            || gold_ingot_count != GOLD_INGOT_COUNT
+            || tnt_count != TNT_COUNT)
+    {
+        return None;
+    }
     let rolls = get_count(&mut rand, 1, 3);
+    let mut emerald_count = 0;
+    let mut diamond_count = 0;
+    let mut prismarine_count = 0;
     for _ in 0..rolls {
         let weight = rand.get_next_int_bound(15);
         if weight < 5 {
-            loot.push(ItemStack(Emerald, get_count(&mut rand, 4, 8) as usize));
+            let value = get_count(&mut rand, 4, 8) as usize;
+            emerald_count += value;
+            loot.push(ItemStack(Emerald, value));
         } else if weight < 10 {
-            loot.push(ItemStack(Diamond, get_count(&mut rand, 1, 2) as usize));
+            let value = get_count(&mut rand, 1, 2) as usize;
+            diamond_count += value;
+            loot.push(ItemStack(Diamond, value));
         } else {
-            loot.push(ItemStack(
-                PrismarineCrystals,
-                get_count(&mut rand, 1, 5) as usize,
-            ));
+            let value = get_count(&mut rand, 1, 5) as usize;
+            prismarine_count += value;
+            loot.push(ItemStack(PrismarineCrystals, value));
         }
     }
 
+    if cfg!(feature = "exit-early")
+        && (emerald_count != EMERALD_COUNT
+            || diamond_count != DIAMOND_COUNT
+            || prismarine_count != PRISMARINE_COUNT)
+    {
+        return None;
+    }
+
     let should_roll = rand.get_next_bool();
-    if cfg!(feature = "exit-early") && CHESTPLATE_OR_SWORD_INDEX.is_some() != should_roll {
+    if cfg!(feature = "exit-early") && (CHESTPLATE_COUNT != 0 || SWORD_COUNT != 0) != should_roll {
         return None;
     }
     if should_roll {
         let weight = rand.get_next_int_bound(2);
         if weight < 1 {
-            if cfg!(feature = "exit-early")
-                && CHESTPLATE_OR_SWORD_INDEX.unwrap().1.equals(&IronSword)
-            {
+            if cfg!(feature = "exit-early") && CHESTPLATE_COUNT != 1 {
                 return None;
             }
             loot.push(ItemStack(LeatherChestplate, 1))
         } else {
-            if cfg!(feature = "exit-early")
-                && CHESTPLATE_OR_SWORD_INDEX
-                    .unwrap()
-                    .1
-                    .equals(&LeatherChestplate)
-            {
+            if cfg!(feature = "exit-early") && SWORD_COUNT != 1 {
                 return None;
             }
             loot.push(ItemStack(IronSword, 1))
         }
     }
 
+    let mut cooked_cod_count = 0;
+    let mut cooked_salmon_count = 0;
+
     for _ in 0..2 {
         let weight = rand.get_next_int_bound(2);
         if weight < 1 {
+            let value = get_count(&mut rand, 2, 4) as usize;
+            cooked_cod_count += value;
             loot.push(ItemStack(CookedCod, get_count(&mut rand, 2, 4) as usize));
         } else {
+            let value = get_count(&mut rand, 2, 4) as usize;
+            cooked_salmon_count += value;
             loot.push(ItemStack(CookedSalmon, get_count(&mut rand, 2, 4) as usize));
         }
+    }
+
+    if cfg!(feature = "exit-early")
+        && (cooked_cod_count != COOKED_COD_COUNT || cooked_salmon_count != COOKED_SALMON_COUNT)
+    {
+        return None;
     }
 
     if indexed {
         let mut container = DEFAULT_CONTAINER;
         rand.shuffle(&mut container);
-        Some(shuffle_items(&mut rand, loot, container))
+        shuffle_items(&mut rand, loot, container)
     } else {
         Some(loot)
     }
@@ -269,7 +303,7 @@ fn shuffle_items(
     rand: &mut ChunkRand,
     items: InventoryVec<ItemStack>,
     container: InventoryVec<usize>,
-) -> InventoryVec<ItemStack> {
+) -> Option<InventoryVec<ItemStack>> {
     let mut list = InventoryVec::new();
     let mut new_items = InventoryVec::new();
     let size = 27;
@@ -293,7 +327,6 @@ fn shuffle_items(
         } else {
             items.push(item_stack2)
         }
-
         if item_stack1.get_count() > 1 && rand.get_next_bool() {
             list.push(item_stack1);
         } else {
@@ -308,12 +341,12 @@ fn shuffle_items(
     let mut result = DEFAULT_INVENTORY;
     let mut i = container.len();
     for item_stack in &items {
-        if item_stack.0 != Empty {
-            result[*unsafe { container.get_unchecked(i - 1) }] = *item_stack;
-        }
         i -= 1;
+        if item_stack.0 != Empty {
+            result[*unsafe { container.get_unchecked(i) }] = *item_stack;
+        }
     }
-    result
+    Some(result)
 }
 
 fn get_loot(

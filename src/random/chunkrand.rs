@@ -1,10 +1,10 @@
 use std::ops::{Deref, DerefMut};
 
-use crate::MC_VERSION;
 use crate::random::jrand::JRand;
 use crate::random::mcversion::V1_13;
 use crate::random::mth::MASK_48;
 use crate::random::seeds::{PositionSeed, RegionSeed};
+use crate::MC_VERSION;
 
 #[derive(Debug)]
 pub struct ChunkRand {
@@ -60,18 +60,15 @@ impl ChunkRand {
 
     pub fn set_population_seed(&mut self, world_seed: i64, x: i32, z: i32) -> i64 {
         self.set_seed(world_seed, true);
-        let a: i64;
-        let b: i64;
-
-        if MC_VERSION.is_older_than(&V1_13) {
-            a = (self.get_next_long() / 2) * 2 + 1;
-            b = self.get_next_long() / 2 * 2 + 1;
+        let (a, b) = if MC_VERSION.is_older_than(&V1_13) {
+            let a = (self.get_next_long() / 2) * 2 + 1;
+            let b = self.get_next_long() / 2 * 2 + 1;
+            (a, b)
         } else {
-            let f = self.get_next_long();
-            a = f | 1;
-            let g = self.get_next_long();
-            b = g | 1;
-        }
+            let a = self.get_next_long() | 1;
+            let b = self.get_next_long() | 1;
+            (a, b)
+        };
 
         let f = x as i64 * a;
         let g = z as i64 * b;

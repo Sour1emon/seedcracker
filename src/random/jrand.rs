@@ -1,3 +1,5 @@
+use crate::random::mth::MASK_48;
+
 #[derive(Debug, Copy, Clone)]
 pub struct JRand {
     lcg: LCG,
@@ -22,19 +24,19 @@ impl JRand {
         rand
     }
 
-    fn of_internal_seed(seed: i64) -> Self {
+    const fn of_internal_seed(seed: i64) -> Self {
         Self::new_scramble(seed, false)
     }
 
-    fn of_scrambled_seed(seed: i64) -> Self {
+    const fn of_scrambled_seed(seed: i64) -> Self {
         Self::new_scramble(seed, false)
     }
 
-    pub fn next_bool(seed: i64) -> bool {
+    pub const fn next_bool(seed: i64) -> bool {
         (((seed as u64) >> 47) & 1) == 1
     }
 
-    pub fn next_int(seed: i64) -> i32 {
+    pub const fn next_int(seed: i64) -> i32 {
         (seed as u64 >> 16) as i32
     }
 
@@ -62,24 +64,29 @@ impl JRand {
         value
     }
 
-    pub fn next_float(seed: i64) -> f32 {
+    pub const fn next_float(seed: i64) -> f32 {
         (seed as u64 >> 24) as f32 / ((1 << 24) as f32)
     }
 
-    pub fn next_long(seed: i64) -> i64 {
+    pub const fn next_long(seed: i64) -> i64 {
         (((seed as u64 >> 16) as i64) << 32) + (LCG::JAVA.next_seed(seed) as u64 >> 16) as i64
     }
 
     pub fn next_double(seed: i64) -> f64 {
-        ((((seed as u64 >> 22) as i64) << 27) + (LCG::JAVA.next_seed(seed) as u64 >> 16) as i64)
-            as f64
-            + Self::DOUBLE_UNIT
+        (((((seed as u64 >> 22) as i64) << 27) + (LCG::JAVA.next_seed(seed) as u64 >> 16) as i64)
+            as f64)
+            * Self::DOUBLE_UNIT
     }
 
     #[inline(always)]
     pub const fn next(&mut self, bits: i32) -> i32 {
-        self.seed = (self.seed * 0x5deece66d + 0xb) & ((1_u64 << 48) - 1) as i64;
+        self.seed = (self.seed * 0x5deece66d + 0xb) & MASK_48;
         (self.seed >> (48 - bits)) as i32
+    }
+
+    #[inline(always)]
+    pub const fn get_next(seed: i64, bits: i32) -> i32 {
+        (((seed * 0x5deece66d + 0xb) & MASK_48) >> (48 - bits)) as i32
     }
 
     #[inline(always)]
@@ -151,17 +158,6 @@ impl JRand {
         next
     }
 
-    #[inline(always)]
-    pub fn next_bits(&mut self, bits: i32) -> i64 {
-        self.seed = self.next_seed();
-
-        if self.lcg.is_power_of_two {
-            (self.seed as u64 >> (self.lcg.trailing_zeros - bits)) as i64
-        } else {
-            self.seed / (1 << bits)
-        }
-    }
-
     pub fn advance_calls(&mut self, calls: i64) {
         self.advance(self.lcg.combine_steps(calls))
     }
@@ -185,35 +181,35 @@ const fn is_power_of_two(value: i64) -> bool {
 }
 
 impl LCG {
-    pub const CC65_M23: LCG = LCG::new(65793, 4282663, 1 << 23);
+    pub const CC65_M23: Self = Self::new(65793, 4282663, 1 << 23);
 
-    pub const VISUAL_BASIC: LCG = LCG::new(1140671485, 12820163, 1 << 24);
+    pub const VISUAL_BASIC: Self = Self::new(1140671485, 12820163, 1 << 24);
 
-    pub const RTL_UNIFORM: LCG = LCG::new(2147483629, 2147483587, (1 << 31) - 1);
-    pub const MINSTD_RAND0_C: LCG = LCG::new(16807, 0, (1 << 31) - 1);
-    pub const MINSTD_RAND_C: LCG = LCG::new(48271, 0, (1 << 31) - 1);
+    pub const RTL_UNIFORM: Self = Self::new(2147483629, 2147483587, (1 << 31) - 1);
+    pub const MINSTD_RAND0_C: Self = Self::new(16807, 0, (1 << 31) - 1);
+    pub const MINSTD_RAND_C: Self = Self::new(48271, 0, (1 << 31) - 1);
 
-    pub const CC65_M31: LCG = LCG::new(16843009, 826366247, 1 << 23);
-    pub const RANDU: LCG = LCG::new(65539, 0, 1 << 31);
-    pub const GLIB_C: LCG = LCG::new(1103515245, 12345, 1 << 31);
+    pub const CC65_M31: Self = Self::new(16843009, 826366247, 1 << 23);
+    pub const RANDU: Self = Self::new(65539, 0, 1 << 31);
+    pub const GLIB_C: Self = Self::new(1103515245, 12345, 1 << 31);
 
-    pub const BORLAND_C: LCG = LCG::new(22695477, 1, 1 << 32);
-    pub const PASCAL: LCG = LCG::new(134775813, 1, 1 << 32);
-    pub const OPEN_VMS: LCG = LCG::new(69069, 1, 1 << 32);
-    pub const NUMERICAL_RECIPES: LCG = LCG::new(1664525, 1013904223, 1 << 32);
-    pub const MS_VISUAL_C: LCG = LCG::new(214013, 2531011, 1 << 32);
+    pub const BORLAND_C: Self = Self::new(22695477, 1, 1 << 32);
+    pub const PASCAL: Self = Self::new(134775813, 1, 1 << 32);
+    pub const OPEN_VMS: Self = Self::new(69069, 1, 1 << 32);
+    pub const NUMERICAL_RECIPES: Self = Self::new(1664525, 1013904223, 1 << 32);
+    pub const MS_VISUAL_C: Self = Self::new(214013, 2531011, 1 << 32);
 
-    pub const JAVA: LCG = LCG::new(25214903917, 11, 1 << 48);
+    pub const JAVA: Self = Self::new(25214903917, 11, 1 << 48);
 
-    pub const JAVA_UNIQUIFIER_OLD: LCG = LCG::new(181783497276652981, 0, 0);
-    pub const JAVA_UNIQUIFIER_NEW: LCG = LCG::new(1181783497276652981, 0, 0);
-    pub const MMIX: LCG = LCG::new(364136223846793005, 1442695040888963407, 0);
-    pub const NEWLIB_C: LCG = LCG::new(6364136223846793005, 1, 0);
-    pub const XKCD: LCG = LCG::new(0, 4, 0);
+    pub const JAVA_UNIQUIFIER_OLD: Self = Self::new(181783497276652981, 0, 0);
+    pub const JAVA_UNIQUIFIER_NEW: Self = Self::new(1181783497276652981, 0, 0);
+    pub const MMIX: Self = Self::new(364136223846793005, 1442695040888963407, 0);
+    pub const NEWLIB_C: Self = Self::new(6364136223846793005, 1, 0);
+    pub const XKCD: Self = Self::new(0, 4, 0);
 
-    pub const fn new(multiplier: i64, addend: i64, modulus: i64) -> LCG {
+    pub const fn new(multiplier: i64, addend: i64, modulus: i64) -> Self {
         let is_power_of_two = is_power_of_two(modulus);
-        LCG {
+        Self {
             multiplier,
             addend,
             modulus,
@@ -226,7 +222,7 @@ impl LCG {
         }
     }
 
-    pub fn combine(lcgs: Vec<LCG>) -> LCG {
+    pub fn combine(lcgs: Vec<Self>) -> Self {
         let mut lcg = lcgs[0];
 
         for x in lcgs {
@@ -237,7 +233,7 @@ impl LCG {
     }
 
     #[inline(always)]
-    pub fn mod_(&self, n: i64) -> i64 {
+    pub const fn mod_(&self, n: i64) -> i64 {
         if self.is_power_of_two {
             return n & (self.modulus - 1);
         } else if n <= 1 << 32 {
@@ -247,7 +243,7 @@ impl LCG {
         panic!("Unsupported operation")
     }
 
-    pub fn combine_steps(&self, steps: i64) -> LCG {
+    pub const fn combine_steps(&self, steps: i64) -> Self {
         let mut multiplier: i64 = 1;
         let mut addend: i64 = 0;
 
@@ -269,15 +265,15 @@ impl LCG {
         multiplier = self.mod_(multiplier);
         addend = self.mod_(addend);
 
-        LCG::new(multiplier, addend, self.modulus)
+        Self::new(multiplier, addend, self.modulus)
     }
 
-    pub fn combine_two(&self, lcg: LCG) -> LCG {
+    pub fn combine_two(&self, lcg: Self) -> Self {
         if self.modulus != lcg.modulus {
             panic!("Unsupported operation")
         }
 
-        LCG::new(
+        Self::new(
             self.multiplier * lcg.multiplier,
             lcg.multiplier * self.addend + lcg.addend,
             self.modulus,
@@ -288,8 +284,8 @@ impl LCG {
     pub const fn next_seed(&self, mut seed: i64) -> i64 {
         let mut m = 1;
         let mut a = 0;
-        let mut im = LCG::JAVA.multiplier;
-        let mut ia = LCG::JAVA.addend;
+        let mut im = Self::JAVA.multiplier;
+        let mut ia = Self::JAVA.addend;
         let mut k = 1;
 
         while k != 0 {
@@ -303,11 +299,11 @@ impl LCG {
         }
 
         seed = seed * m + a;
-        seed & 0xffffffffffff
+        seed & MASK_48
     }
 
     #[inline(always)]
-    pub fn invert(&self) -> LCG {
+    pub const fn invert(&self) -> Self {
         self.combine_steps(-1)
     }
 

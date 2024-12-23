@@ -20,7 +20,7 @@ impl MCVersion {
     }
 
     #[inline]
-    pub const fn const_cmp(&self, other: &MCVersion) -> Ordering {
+    pub const fn const_cmp(&self, other: &Self) -> Ordering {
         if self.release > other.release {
             Ordering::Greater
         } else if self.release < other.release {
@@ -34,7 +34,7 @@ impl MCVersion {
         }
     }
 
-    pub fn from_string(name: &str) -> Option<&'static MCVersion> {
+    pub fn from_string(name: &str) -> Option<&'static Self> {
         VERSIONS_MAP.get(name).cloned()
     }
 
@@ -46,50 +46,50 @@ impl MCVersion {
         self.sub_version
     }
 
-    pub const fn latest() -> &'static MCVersion {
+    pub const fn latest() -> &'static Self {
         &VERSIONS[0]
     }
 
-    pub const fn oldest() -> &'static MCVersion {
+    pub const fn oldest() -> &'static Self {
         VERSIONS.last().unwrap()
     }
 
-    pub const fn is_newer_than(&self, other: &MCVersion) -> bool {
+    pub const fn is_newer_than(&self, other: &Self) -> bool {
         self.const_cmp(other).is_gt()
     }
 
-    pub const fn is_newer_or_equal_to(&self, other: &MCVersion) -> bool {
+    pub const fn is_newer_or_equal_to(&self, other: &Self) -> bool {
         !self.const_cmp(other).is_lt()
     }
 
-    pub const fn is_older_than(&self, other: &MCVersion) -> bool {
+    pub const fn is_older_than(&self, other: &Self) -> bool {
         self.const_cmp(other).is_lt()
     }
 
-    pub const fn is_older_or_equal_to(&self, other: &MCVersion) -> bool {
+    pub const fn is_older_or_equal_to(&self, other: &Self) -> bool {
         !self.const_cmp(other).is_gt()
     }
 
-    pub const fn is_equal_to(&self, other: &MCVersion) -> bool {
+    pub const fn is_equal_to(&self, other: &Self) -> bool {
         !self.const_cmp(other).is_eq()
     }
 
-    pub const fn is_between(&self, a: &MCVersion, b: &MCVersion) -> bool {
+    pub const fn is_between(&self, a: &Self, b: &Self) -> bool {
         !self.const_cmp(a).is_lt() && !self.const_cmp(b).is_gt()
     }
 
-    pub const fn is_between_exclusive(&self, a: &MCVersion, b: &MCVersion) -> bool {
+    pub const fn is_between_exclusive(&self, a: &Self, b: &Self) -> bool {
         self.const_cmp(a).is_gt() && self.const_cmp(b).is_lt()
     }
 
-    pub fn newer(&self) -> Option<&'static MCVersion> {
+    pub fn newer(&self) -> Option<&'static Self> {
         VERSIONS
             .iter()
             .position(|v| v.name == self.name)
             .and_then(|i| if i > 0 { Some(&VERSIONS[i - 1]) } else { None })
     }
 
-    pub fn older(&self) -> Option<&'static MCVersion> {
+    pub fn older(&self) -> Option<&'static Self> {
         VERSIONS
             .iter()
             .position(|v| v.name == self.name)
@@ -97,26 +97,26 @@ impl MCVersion {
     }
 
     pub const fn is_release(&self) -> bool {
-        MCVersion::is_release_static(self)
+        Self::is_release_static(self)
     }
 
-    const fn is_release_static(version: &MCVersion) -> bool {
+    const fn is_release_static(version: &Self) -> bool {
         version.is_older_or_equal_to(&V1_0)
     }
 
     pub const fn is_alpha(&self) -> bool {
-        MCVersion::is_alpha_static(self)
+        Self::is_alpha_static(self)
     }
 
-    const fn is_alpha_static(version: &MCVersion) -> bool {
+    const fn is_alpha_static(version: &Self) -> bool {
         version.is_between(&VA1_0_4, &VA1_2_6)
     }
 
     pub const fn is_beta(&self) -> bool {
-        MCVersion::is_beta_static(self)
+        Self::is_beta_static(self)
     }
 
-    const fn is_beta_static(version: &MCVersion) -> bool {
+    const fn is_beta_static(version: &Self) -> bool {
         version.is_between(&VB1_0, &VB1_8_1)
     }
 }

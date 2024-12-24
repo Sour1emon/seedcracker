@@ -26,7 +26,7 @@ pub const MC_VERSION: MCVersion = V1_16_5;
 const BURIED_TREASURE_SALT: i64 = 10387320;
 
 #[inline(always)]
-pub const fn can_spawn_buried_treasure(seed: u64, chunk_x: i32, chunk_z: i32) -> bool {
+pub const fn can_spawn_buried_treasure_readable(seed: u64, chunk_x: i32, chunk_z: i32) -> bool {
     let seed = ((chunk_x as i64 * 341873128712
         + chunk_z as i64 * 132897987541
         + seed as i64
@@ -37,12 +37,18 @@ pub const fn can_spawn_buried_treasure(seed: u64, chunk_x: i32, chunk_z: i32) ->
 }
 
 #[inline(always)]
-pub const fn can_spawn_buried_treasure_full(seed: u64, chunk_x: i32, chunk_z: i32) -> bool {
-    let seed =
-        ((chunk_x as i64 * 341873128712 + chunk_z as i64 * 132897987541 + seed as i64 + 10387320)
-            ^ 0x5deece66d)
-            & ((1 << 48) - 1);
-    ((((seed * 0x5deece66d + 0xb) & ((1 << 48) - 1)) >> (48 - 24)) as i32 as f32) < 167772.16
+pub const fn can_spawn_buried_treasure(seed: u64, chunk_x: i32, chunk_z: i32) -> bool {
+    (((((((chunk_x as i64 * 341873128712
+        + chunk_z as i64 * 132897987541
+        + seed as i64
+        + 10387320)
+        ^ 0x5deece66d)
+        & MASK_48)
+        * 0x5deece66d
+        + 0xb)
+        & MASK_48)
+        >> (24)) as i32 as f32)
+        < 167772.16
 }
 
 #[must_use]

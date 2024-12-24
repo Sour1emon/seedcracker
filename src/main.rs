@@ -45,6 +45,7 @@ static FOUND_SEED: AtomicBool = AtomicBool::new(false);
 static SEEDS_SCANNED: AtomicU64 = AtomicU64::new(MAX_SEEDS);
 
 fn main() {
+    let value = check_seed((-4872636734044769429_i64) as u64, CHUNK_X, CHUNK_Z);
     let time = Instant::now();
     let mut threads: Vec<JoinHandle<()>> = vec![];
     for thread_idx in 0..MAX_THREADS {
@@ -61,7 +62,7 @@ fn main() {
                         unsafe { SHOULD_STOP = true };
                         break;
                     } else {
-                        return
+                        return;
                     }
                 }
             }
@@ -76,7 +77,11 @@ fn main() {
         println!("No seed found!");
     }
     println!("Stats:");
-    println!("{} seeds scanned in {:.3?}", seeds_scanned, elapsed);
+    println!(
+        "{} seeds scanned in {:.3?}",
+        format_num(seeds_scanned),
+        elapsed
+    );
     println!(
         "{} seeds/s",
         format_num((seeds_scanned as f64 / elapsed.as_secs_f64()) as u64)
@@ -89,4 +94,5 @@ fn main() {
         "{:.3}ns per seed",
         (elapsed.as_nanos() as f64) / seeds_scanned as f64
     );
+    println!("{:.3} hours for checking all seeds", 2.0_f64.powi(48) /  (seeds_scanned as f64 / (elapsed.as_secs_f64() / 3600.0)))
 }

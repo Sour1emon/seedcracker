@@ -11,12 +11,24 @@ exit-early = []
 arrayvec = { path = "arrayvec" }
 const_for = "0.1.5"
 lazy_static = "1.5.0"
-ocl = "0.19.7"
+metal = "0.30.0"
 snmalloc-rs = { version = "0.3.7", features = ["native-cpu", "lto"] }
+
+
+[[bin]]
+name = "seedcracker"
+path = "src/main.rs"
+
+
+[[bin]]
+name = "metaltest"
+path = "src/metal.rs"
+
+
+[build-dependencies]
 
 [profile.dev]
 overflow-checks = false
-
 
 [profile.release]
 opt-level = 3
@@ -28,7 +40,7 @@ panic = "abort"
 
 [dev-dependencies]
 criterion = "0.5.1"
-rand = "0.8.5"
+rand = "0.9.0-beta.1"
 
 [[bench]]
 name = "seedcracker_bench"

@@ -8,30 +8,40 @@
 #ifndef rng_h
 #define rng_h
 
+#include <stdint.h>
+
+// https://en.wikipedia.org/wiki/Linear_congruential_generator
+
 // Multiplier
-constant uint64_t JAVA_LCG_MULTIPLIER = 0x5deece66d;
+inline const uint64_t JAVA_LCG_MULTIPLIER = 0x5deece66d;
 
 // Addend
-constant uint64_t JAVA_LCG_ADDEND = 0xb;
+inline const uint64_t JAVA_LCG_ADDEND = 0xb;
 
-// Modulus
-constant int64_t MASK_48 = (uint64_t)((1ULL << 48) - 1);
+// Modulus (probably should be (1 << 48))
+inline const uint64_t MASK_48 = (1ULL << 48) - 1;
 
-static inline void setSeed(thread uint64_t *seed, uint64_t value) {
+
+
+inline const uint64_t BURIED_TREASURE_SALT = 10387320;
+inline const uint64_t BURIED_TREASURE_DECORATOR_SALT = 30001;
+
+inline const int32_t CHUNK_X = -28;
+inline const int32_t CHUNK_Z = -73;
+
+static inline void setSeed(uint64_t *seed, uint64_t value)
+{
     *seed = (value ^ JAVA_LCG_MULTIPLIER) & MASK_48;
 }
 
-static inline int next(thread uint64_t *seed, const int bits)
+static inline int next(uint64_t *seed, const int bits)
 {
     *seed = (*seed * JAVA_LCG_MULTIPLIER + JAVA_LCG_ADDEND) & MASK_48;
-    return (int) ((int64_t) *seed >> (48 - bits));
+    return (int) ((int64_t)*seed >> (48 - bits));
 }
 
-static inline bool nextBool(thread uint64_t *seed, const int bits) {
-    return next(seed, 1) == 1;
-}
-
-static inline int nextInt(thread uint64_t *seed, const int n) {
+static inline int nextInt(uint64_t *seed, const int n)
+{
     int bits, val;
     const int m = n - 1;
     
@@ -48,34 +58,38 @@ static inline int nextInt(thread uint64_t *seed, const int n) {
     return val;
 }
 
-static inline uint64_t nextLong(thread uint64_t *seed)
+static inline uint64_t nextLong(uint64_t *seed)
 {
     return ((uint64_t) next(seed, 32) << 32) + next(seed, 32);
 }
 
-static inline float nextFloat(thread uint64_t *seed)
+static inline float nextFloat(uint64_t *seed)
 {
     return next(seed, 24) / (float) (1 << 24);
 }
 
-static inline void skipNextN(thread uint64_t *seed, uint64_t n) {
-    uint64_t m = 1;
-    uint64_t a = 0;
-    uint64_t im = JAVA_LCG_MULTIPLIER;
-    uint64_t ia = JAVA_LCG_ADDEND;
-    uint64_t k;
+// Minecraft
+
+bool inline canGenerateTreasure(uint64_t seed) {
+    seed = CHUNK_X * 341873128712ULL + CHUNK_Z * 132897987541ULL + seed + BURIED_TREASURE_SALT;
+    setSeed(&seed, seed);
+    return nextFloat(&seed) < 0.01;
+}
+
+uint64_t inline getPopulationSeed(uint64_t worldSeed, int32_t x, int32_t z) {
+    uint64_t seed;
+    setSeed(&seed, worldSeed);
+    int64_t a = nextLong(&seed) | 1;
+    int64_t b = nextLong(&seed) | 1;
     
-    for (k = n; k; k >>= 1) {
-        if (k & 1) {
-            m *= im;
-            a = im * a + ia;
-        }
-        ia = (im + 1) * ia;
-        im *= im;
-    }
-    
-    *seed = *seed * m + a;
-    *seed &= MASK_48;
+    seed = (((int64_t) x * a) + ((int64_t) z * b)) ^ worldSeed;
+    return seed & MASK_48;
+}
+
+uint64_t inline getDecoratorSeed(uint64_t worldSeed, int32_t x, int32_t z, const int32_t salt) {
+    uint64_t seed = getPopulationSeed(worldSeed, x, z);
+    setSeed(&seed, seed + (uint64_t) salt);
+    return seed & MASK_48;
 }
 
 #endif /* rng_h */

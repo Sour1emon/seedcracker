@@ -6,7 +6,6 @@
 //
 
 #include <metal_stdlib>
-#include "rng.h"
 
 using namespace metal;
 
@@ -15,6 +14,63 @@ constant int32_t BURIED_TREASURE_DECORATOR_SALT = 30001;
 
 constant int32_t CHUNK_X = -28;
 constant int32_t CHUNK_Z = -73;
+
+//
+// RANDOM NUMBER GENERATOR
+//
+// Linear Congruential Generator (LCG)
+
+// Multiplier
+constant uint64_t JAVA_LCG_MULTIPLIER = 0x5deece66d;
+
+// Addend
+constant uint64_t JAVA_LCG_ADDEND = 0xb;
+
+// Modulus
+constant int64_t MASK_48 = (int64_t)((1ULL << 48) - 1);
+
+static inline void setSeed(thread uint64_t *seed, uint64_t value)
+{
+    *seed = (value ^ JAVA_LCG_MULTIPLIER) & MASK_48;
+}
+
+static inline int32_t next(thread uint64_t *seed, const int32_t bits)
+{
+    *seed = (*seed * JAVA_LCG_MULTIPLIER + JAVA_LCG_ADDEND) & MASK_48;
+    return (int32_t) ((int64_t)*seed >> (48 - bits));
+}
+
+static inline bool nextBool(thread uint64_t *seed) {
+    return next(seed, 1) == 1;
+}
+
+static inline int32_t nextInt(thread uint64_t *seed, const int32_t n)
+{
+    int32_t bits, val;
+    const int32_t m = n - 1;
+    
+    if ((m & n) == 0) {
+        uint64_t x = n * (uint64_t)next(seed, 31);
+        return (int32_t) ((int64_t) x >> 31);
+    }
+    
+    do {
+        bits = next(seed, 31);
+        val = bits % n;
+    }
+    while ((int32_t)((uint32_t)bits - val + m) < 0);
+    return val;
+}
+
+static inline uint64_t nextLong(thread uint64_t *seed)
+{
+    return ((uint64_t) next(seed, 32) << 32) + next(seed, 32);
+}
+
+static inline float nextFloat(thread uint64_t *seed)
+{
+    return next(seed, 24) / (float) (1 << 24);
+}
 
 uint64_t inline getPopulationSeed(uint64_t worldSeed, int32_t x, int32_t z) {
     uint64_t seed;
@@ -36,14 +92,9 @@ uint64_t inline getDecoratorSeed(uint64_t worldSeed, int32_t x, int32_t z, int32
 // HELPER FUNCTIONS
 //
 
-bool inline canGenerateTreasureClean(uint64_t seed) {
-    
-    int32_t newSeed = (float)(int32_t)(((((((uint64_t) CHUNK_X * 341873128712 + (uint64_t) CHUNK_Z * 132897987541 + (int64_t) seed + 10387320) ^ JAVA_LCG_MULTIPLIER) & MASK_48) * JAVA_LCG_MULTIPLIER + JAVA_LCG_ADDEND) & MASK_48) >> 24);
-    return newSeed < 167772.16;
-}
-
 bool canGenerateTreasure(uint64_t seed) {
     uint64_t s = CHUNK_X * 341873128712ULL + CHUNK_Z * 132897987541ULL + BURIED_TREASURE_SALT + seed;
+    setSeed(&s, s);
     return nextFloat(&s) < 0.01;
 }
 

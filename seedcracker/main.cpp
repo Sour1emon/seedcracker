@@ -15,6 +15,8 @@ using namespace std::chrono;
 #include <mach-o/dyld.h>
 #include <limits.h>
 
+#include "rng.h"
+
 std::string format_num(uint64_t num) {
     std::ostringstream oss;
     if (num < 10000) {
@@ -42,6 +44,9 @@ std::string format_num(uint64_t num) {
 constexpr uint64_t MAX_SEED = 1ul << 36;
 
 int main() {
+    
+    //std::cout << "Ouput: " << canGenerateTreasure(13574107339664782187ul) << std::endl;
+    
     auto device = MTL::CreateSystemDefaultDevice();
     if (!device) {
         std::cerr << "Metal is not supported on this device." << std::endl;
@@ -92,6 +97,8 @@ int main() {
     computeEncoder->dispatchThreads(threadgroupCount, threadsPerThreadgroup);
     computeEncoder->endEncoding();
     
+    std::cout << "Starting seed cracking on gpu" << std::endl;
+    
     commandBuffer->commit();
     
     auto start = high_resolution_clock::now();
@@ -102,10 +109,12 @@ int main() {
     
     auto elapsed = stop - start;
     
-    std::cout << format_num(MAX_SEED) << " seeds in " << static_cast<double>(duration_cast<milliseconds>(elapsed).count()) / 1000 << " seconds\n";
-    std::cout << format_num((uint64_t)((double) MAX_SEED / duration<double>(elapsed).count())) << " seeds/s or " << std::fixed << std::setprecision(4) << (double) duration_cast<nanoseconds>(elapsed).count() / MAX_SEED << " ns per seed\n";
+    std::cout << format_num(MAX_SEED) << " seeds in " << static_cast<double>(duration_cast<milliseconds>(elapsed).count()) / 1000 << " seconds" << std::endl;;
+    std::cout << format_num((uint64_t)((double) MAX_SEED / duration<double>(elapsed).count())) << " seeds/s or " << std::fixed << std::setprecision(4) << (double) duration_cast<nanoseconds>(elapsed).count() / MAX_SEED << " ns per seed" << std::endl;;
     
     uint64_t *resultData = static_cast<uint64_t *>(resultBuffer->contents());
+    
+    std::cout << resultData[1] << std::endl;;
     
     resultBuffer->release();
     computeEncoder->release();

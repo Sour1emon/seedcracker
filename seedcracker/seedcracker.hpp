@@ -12,7 +12,7 @@
 #include <stdint.h>
 #include <algorithm>
 #include "rng.hpp"
-#include "cubiomes/finders.h"
+#include "finders.h"
 
 typedef unsigned char uchar;
 

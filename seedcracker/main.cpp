@@ -1,23 +1,27 @@
-#define NS_PRIVATE_IMPLEMENTATION
-#define CA_PRIVATE_IMPLEMENTATION
-#define MTL_PRIVATE_IMPLEMENTATION
-#include <Foundation/Foundation.hpp>
-#include <Metal/Metal.hpp>
-#include <QuartzCore/QuartzCore.hpp>
+//
+//  main.cpp
+//  seedcracker
+//
+//  Created by Isaac Bess on 12/24/24.
+//
 
+#include "seedcracker.hpp"
+
+#include <iostream>
 #include <iostream>
 #include <string>
 #include <sstream>
 #include <iomanip>
 #include <chrono>
+#include <vector>
+#include <thread>
+#include <array>
+#include <optional>
+#include <pthread.h>
+
 using namespace std::chrono;
 
-#include <mach-o/dyld.h>
-#include <limits.h>
-
-#include "rng.h"
-
-std::string format_num(uint64_t num) {
+std::string formatNum(uint64_t num) {
     std::ostringstream oss;
     if (num < 10000) {
         oss << num;
@@ -41,87 +45,54 @@ std::string format_num(uint64_t num) {
     return oss.str();
 }
 
-constexpr uint64_t MAX_SEED = 1ul << 36;
+const uint64_t MAX_SEEDS = 1ul << 32;
 
-int main() {
-    
-    //std::cout << "Ouput: " << canGenerateTreasure(13574107339664782187ul) << std::endl;
-    
-    auto device = MTL::CreateSystemDefaultDevice();
-    if (!device) {
-        std::cerr << "Metal is not supported on this device." << std::endl;
-        return -1;
+const int THREAD_COUNT = 16;
+
+static std::array<std::thread, THREAD_COUNT> THREADS;
+
+void checkSeedsThread(int tIdx, uint64_t *seedsScanned, bool *shouldStop) {
+    Generator g;
+    setupGenerator(&g, MC_1_16_5, 0);
+    for (uint64_t s = tIdx; s < MAX_SEEDS; s += THREAD_COUNT) {
+        if (*shouldStop) {
+            break;
+        }
+        uint64_t lower48 = s + uint64_t(-4872636734044769429) - MAX_SEEDS + 1;
+        if (checkSeed(lower48, &g, CHUNK_X, CHUNK_Z)) {
+            std::cout << "Found Seed: " << (int64_t) lower48 << std::endl;
+            *seedsScanned = s;
+            *shouldStop = true;
+            break;
+        };
     }
-    
-    auto commandQueue = device->newCommandQueue();
-    
-    // Load Metal library and create a compute pipeline
-    auto defaultLibrary = device->newDefaultLibrary();
-    
-    auto functionConstants = MTL::FunctionConstantValues::alloc()->init();
-    functionConstants->setConstantValue(&MAX_SEED, MTL::DataTypeULong, NS::UInteger(0));
-    
-    NS::Error* error = nullptr;
-    auto kernelFunction = defaultLibrary->newFunction(NS::String::string("find_seed", NS::UTF8StringEncoding), functionConstants, &error);
-    
-    if (error) {
-        std::cerr << "Error creating function: "
-        << error->localizedDescription()->utf8String() << std::endl;
-        return -1;
-    }
-    
-    auto pipelineState = device->newComputePipelineState(kernelFunction, &error);
-    
-    if (error) {
-        std::cerr << "Error creating compute pipeline: "
-        << error->localizedDescription()->utf8String() << std::endl;
-        return -1;
-    }
-    
-    auto resultBuffer = device->newBuffer(sizeof(uint64_t) * 2, MTL::ResourceStorageModeShared);
-    auto shouldExitBuffer = device->newBuffer(sizeof(bool), MTL::ResourceStorageModeShared);
-    
-    auto commandBuffer = commandQueue->commandBuffer();
-    auto computeEncoder = commandBuffer->computeCommandEncoder();
-    
-    computeEncoder->setComputePipelineState(pipelineState);
-    computeEncoder->setBuffer(resultBuffer, 0, 0);
-    computeEncoder->setBuffer(shouldExitBuffer, 0, 1);
-    
-    auto max_threads_per_group = pipelineState->maxTotalThreadsPerThreadgroup();
-    auto num_thread_groups = (MAX_SEED + max_threads_per_group - 1) / max_threads_per_group;
-    
-    MTL::Size threadsPerThreadgroup = MTL::Size::Make(max_threads_per_group, 1, 1);
-    MTL::Size threadgroupCount = MTL::Size::Make(num_thread_groups, 1, 1);
-    
-    computeEncoder->dispatchThreads(threadgroupCount, threadsPerThreadgroup);
-    computeEncoder->endEncoding();
-    
-    std::cout << "Starting seed cracking on gpu" << std::endl;
-    
-    commandBuffer->commit();
-    
+}
+
+int main () {
+    uint64_t seedsScanned = MAX_SEEDS;
+    bool shouldStop = false;
     auto start = high_resolution_clock::now();
-    
-    commandBuffer->waitUntilCompleted();
-    
+    for (int tIdx = 0; tIdx < THREAD_COUNT; tIdx++) {
+        std::thread thread(checkSeedsThread, tIdx, &seedsScanned, &shouldStop);
+        THREADS[tIdx] = std::move(thread);
+    }
+    for (int tIdx = 0; tIdx < THREAD_COUNT; tIdx++) {
+        std::thread *thread = &THREADS[tIdx];
+        thread->join();
+    }
     auto stop = high_resolution_clock::now();
     
     auto elapsed = stop - start;
     
-    std::cout << format_num(MAX_SEED) << " seeds in " << static_cast<double>(duration_cast<milliseconds>(elapsed).count()) / 1000 << " seconds" << std::endl;;
-    std::cout << format_num((uint64_t)((double) MAX_SEED / duration<double>(elapsed).count())) << " seeds/s or " << std::fixed << std::setprecision(4) << (double) duration_cast<nanoseconds>(elapsed).count() / MAX_SEED << " ns per seed" << std::endl;;
+    std::cout << "Stats:" << std::endl;
     
-    uint64_t *resultData = static_cast<uint64_t *>(resultBuffer->contents());
+    std::cout << formatNum(seedsScanned) << " seeds scanned in " << std::fixed << std::setprecision(4) << (double) duration_cast<microseconds>(elapsed).count() / 1000.0 << "ms" << std::endl;
     
-    std::cout << resultData[1] << std::endl;;
+    std::cout << formatNum(((double) seedsScanned / ((double) duration_cast<microseconds>(elapsed).count() / (1000.0 * 1000.0)))) << " seeds/s" << std::endl;
     
-    resultBuffer->release();
-    computeEncoder->release();
-    commandBuffer->release();
-    pipelineState->release();
-    kernelFunction->release();
-    defaultLibrary->release();
-    commandQueue->release();
-    device->release();
+    std::cout << formatNum((uint64_t) ((double) seedsScanned / ((double) duration_cast<microseconds>(elapsed).count() / (1000.0 * 1000.0 * 3600.0)))) << " seeds/h" << std::endl;
+    
+    std::cout << std::fixed << std::setprecision(4) << ((double) duration_cast<nanoseconds>(elapsed).count() / (double) seedsScanned) << "ns per seed" << std::endl;
+    
+    std::cout << std::fixed << std::setprecision(4) << std::pow(2.0, 48.0) / (((double) seedsScanned / ((double) duration_cast<microseconds>(elapsed).count() / (1000.0 * 1000.0 * 3600.0)))) << " hours for checking all seeds" << std::endl;
 }

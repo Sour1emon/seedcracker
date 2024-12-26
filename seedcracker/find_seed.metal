@@ -37,7 +37,7 @@ static inline void setSeed(thread uint64_t *seed, uint64_t value)
 static inline int32_t next(thread uint64_t *seed, const int32_t bits)
 {
     *seed = (*seed * JAVA_LCG_MULTIPLIER + JAVA_LCG_ADDEND) & MASK_48;
-    return (int32_t) ((int64_t)*seed >> (48 - bits));
+    return (int32_t) (*seed >> (48 - bits));
 }
 
 static inline bool nextBool(thread uint64_t *seed) {
@@ -64,7 +64,7 @@ static inline int32_t nextInt(thread uint64_t *seed, const int32_t n)
 
 static inline uint64_t nextLong(thread uint64_t *seed)
 {
-    return ((uint64_t) next(seed, 32) << 32) + next(seed, 32);
+    return (((uint64_t) next(seed, 32)) << 32) + (uint64_t) next(seed, 32);
 }
 
 static inline float nextFloat(thread uint64_t *seed)
@@ -84,7 +84,7 @@ uint64_t inline getPopulationSeed(uint64_t worldSeed, int32_t x, int32_t z) {
 
 uint64_t inline getDecoratorSeed(uint64_t worldSeed, int32_t x, int32_t z, int32_t salt) {
     uint64_t seed = getPopulationSeed(worldSeed, x, z);
-    setSeed(&seed, seed + (int64_t) salt);
+    setSeed(&seed, seed + (uint64_t) salt);
     return seed & MASK_48;
 }
 
@@ -176,10 +176,10 @@ COUNT_ITEMS(IRON_SWORD);
 COUNT_ITEMS(COOKED_COD);
 COUNT_ITEMS(COOKED_SALMON);
 
-#define CHECK_COUNT(ITEM)
-//if (ITEM##_COUNT == 0) {    \
-//return false;             \
-//}
+#define CHECK_COUNT(ITEM)   \
+if (ITEM##_COUNT == 0) {    \
+return false;               \
+}
 
 ItemStack inline splitItemstack(thread ItemStack *itemStack, char count) {
     char splitCount = min(count, itemStack->count);
@@ -258,7 +258,7 @@ public:
     }
 };
 
-bool shuffleChest(uint64_t seed, InventoryVec<ItemStack> loot) {
+bool shuffleChest(uint64_t seed, InventoryVec<ItemStack> loot, device uint64_t *resultBuffer) {
     InventoryVec<char> container = {
         27,
         {
@@ -318,12 +318,15 @@ bool shuffleChest(uint64_t seed, InventoryVec<ItemStack> loot) {
 
 #define PUSH_ITEM(ITEM, COUNT) loot.push({ ITEM, COUNT });
 
-bool isCorrectLoot(uint64_t structureSeed) {
-    structureSeed = getDecoratorSeed(structureSeed, CHUNK_X * 16, CHUNK_Z * 16,
+bool isCorrectLoot(uint64_t structureSeed, device uint64_t *result) {
+    
+    uint64_t seed = getDecoratorSeed(structureSeed, CHUNK_X * 16, CHUNK_Z * 16,
                                      BURIED_TREASURE_DECORATOR_SALT);
+    
     // Loot seed
-    uint64_t seed;
-    setSeed(&seed, nextLong(&structureSeed));
+    setSeed(&seed, nextLong(&seed));
+    
+    result[1] = seed;
     
     InventoryVec<ItemStack> loot = {
         1,
@@ -395,7 +398,6 @@ bool isCorrectLoot(uint64_t structureSeed) {
     if ((LEATHER_CHESTPLATE_COUNT != 0 || IRON_SWORD_COUNT != 0) != shouldRoll) {
         return false;
     }
-    
     if (shouldRoll) {
         char weight = nextInt(&seed, 2);
         if (weight < 1) {
@@ -429,14 +431,15 @@ bool isCorrectLoot(uint64_t structureSeed) {
         return false;
     }
     
-    return shuffleChest(seed, loot);
+    return shuffleChest(seed, loot, result);
 }
 
-bool inline checkSeed(uint64_t seed) {
+bool inline checkSeed(uint64_t seed, device uint64_t *result) {
     if (!canGenerateTreasure(seed)) {
         return false;
     }
-    return isCorrectLoot(seed);
+    result[0] = 1;
+    return isCorrectLoot(seed, result);
 }
 
 // 13574107339664782187ul
@@ -450,19 +453,24 @@ void find_seed(
                 uint tid [[thread_position_in_grid]],
                 uint threads_per_grid [[threads_per_grid]])
 {
+    //result[0] = checkSeed(seed, result);
+    //result[1] = nextLong(&seed);
     if (tid == 1) {
+        result[0] = 0;
+        result[1] = 0;
+        uint64_t seed = 13574107339664782187ul;
+        checkSeed(seed, result);
         *exit_flag = false;
+    } else {
+        return;
     }
     
-    for (uint64_t lower48 = tid; lower48 < MAX_SEED - threads_per_grid; lower48 += threads_per_grid) {
-//        if (*exit_flag) {
+//    for (uint64_t lower48 = tid; lower48 < MAX_SEED - threads_per_grid; lower48 += threads_per_grid) {
+//        if (checkSeed(lower48 + 13574107339664782187ul - MAX_SEED + 1, result) && !(*exit_flag)) {
+//            result[0] = lower48 + 1;
+//            result[1]++;
+//            *exit_flag = true;
 //            break;
 //        }
-        if (checkSeed(lower48 + 13574107339664782187ul - MAX_SEED + 1)) {
-            result[0] = lower48;
-            result[1]++;
-            *exit_flag = true;
-            break;
-        }
-    }
+//    }
 }

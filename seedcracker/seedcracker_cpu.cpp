@@ -21,6 +21,8 @@
 
 using namespace std::chrono;
 
+
+
 std::string formatNum(uint64_t num) {
     std::ostringstream oss;
     if (num < 10000) {
@@ -45,7 +47,7 @@ std::string formatNum(uint64_t num) {
     return oss.str();
 }
 
-const uint64_t MAX_SEEDS = 1ul << 32;
+const uint64_t MAX_SEEDS = 1ul << 36;
 
 const int THREAD_COUNT = 16;
 
@@ -58,7 +60,7 @@ void checkSeedsThread(int tIdx, uint64_t *seedsScanned, bool *shouldStop) {
         if (*shouldStop) {
             break;
         }
-        uint64_t lower48 = s + uint64_t(-4872636734044769429) - MAX_SEEDS + 1;
+        uint64_t lower48 = s;// + uint64_t(-4872636734044769429) - MAX_SEEDS + 1;
         if (checkSeed(lower48, &g, CHUNK_X, CHUNK_Z)) {
             std::cout << "Found Seed: " << (int64_t) lower48 << std::endl;
             *seedsScanned = s;

@@ -34,7 +34,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		6A00ED8F2D1CEFD500EC252A /* seedcracker.profdata */ = {isa = PBXFileReference; lastKnownFileType = file; path = seedcracker.profdata; sourceTree = "<group>"; };
 		6A0254662D1B790100FD8FE6 /* seedcracker_test */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = seedcracker_test; sourceTree = BUILT_PRODUCTS_DIR; };
 		6A1FB6D02D1A713400BED3DE /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		6A1FB6D22D1A713C00BED3DE /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
@@ -47,7 +46,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				cubiomes/tests.c,
-				main2.cpp,
+				seedcracker_cpu.cpp,
 			);
 			target = 6ADA5C222D19D403004FA1E5 /* seedcracker */;
 		};
@@ -90,14 +89,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		6A00ED902D1CEFD500EC252A /* OptimizationProfiles */ = {
-			isa = PBXGroup;
-			children = (
-				6A00ED8F2D1CEFD500EC252A /* seedcracker.profdata */,
-			);
-			path = OptimizationProfiles;
-			sourceTree = "<group>";
-		};
 		6A1FB6CF2D1A713400BED3DE /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -115,7 +106,6 @@
 				6A0254672D1B790100FD8FE6 /* seedcracker_test */,
 				6A1FB6CF2D1A713400BED3DE /* Frameworks */,
 				6ADA5C242D19D403004FA1E5 /* Products */,
-				6A00ED902D1CEFD500EC252A /* OptimizationProfiles */,
 			);
 			sourceTree = "<group>";
 		};
@@ -236,6 +226,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = MP8XY5XRC9;
 				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_KEY_MetalCaptureEnabled = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -246,6 +237,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = MP8XY5XRC9;
 				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_KEY_MetalCaptureEnabled = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -379,7 +371,12 @@
 				GCC_THREADSAFE_STATICS = YES;
 				GCC_UNROLL_LOOPS = YES;
 				HEADER_SEARCH_PATHS = "/Users/isaac/metal-cpp";
+				INFOPLIST_KEY_MetalCaptureEnabled = YES;
 				LLVM_LTO = YES;
+				MTL_ENABLE_MODULES = YES;
+				MTL_MATH_FP32_FUNCTIONS = FAST;
+				MTL_MATH_MODE = FAST;
+				MTL_OPTIMIZATION_LEVEL = "-03";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -399,7 +396,12 @@
 				GCC_THREADSAFE_STATICS = YES;
 				GCC_UNROLL_LOOPS = YES;
 				HEADER_SEARCH_PATHS = "/Users/isaac/metal-cpp";
+				INFOPLIST_KEY_MetalCaptureEnabled = YES;
 				LLVM_LTO = YES;
+				MTL_ENABLE_MODULES = YES;
+				MTL_MATH_FP32_FUNCTIONS = FAST;
+				MTL_MATH_MODE = FAST;
+				MTL_OPTIMIZATION_LEVEL = "-03";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;

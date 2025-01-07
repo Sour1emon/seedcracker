@@ -17,7 +17,7 @@ using namespace std::chrono;
 #include <limits.h>
 #include <stddef.h>
 
-std::string format_num(uint64_t num) {
+std::string formatNum(uint64_t num) {
     std::ostringstream oss;
     if (num < 10000) {
         oss << num;
@@ -43,13 +43,13 @@ std::string format_num(uint64_t num) {
 
 constexpr uint64_t MAX_SEED = 1ul << 36;
 
-int main2() {
-//    //std::cout << (uint64_t) (-16256950163) << std::endl;
-//    int64_t seed = 4506419895;
-//    std::cout << nextLong(&seed) << std::endl;
-//    exit(0);
-    
+const char* GPU_TRACE_PATH = "/Users/isaac/seedcracker/seedcracker/profile.gputrace";
+
+const bool SHOULD_CAPTURE = false;
+
+int main() {
     auto device = MTL::CreateSystemDefaultDevice();
+    
     if (!device) {
         std::cerr << "Metal is not supported on this device." << std::endl;
         return -1;
@@ -82,6 +82,27 @@ int main2() {
     
     auto resultBuffer = device->newBuffer(sizeof(uint64_t) * 2, MTL::ResourceStorageModeShared);
     auto shouldExitBuffer = device->newBuffer(sizeof(bool), MTL::ResourceStorageModeShared);
+    MTL::CaptureManager *captureManager;
+    if (SHOULD_CAPTURE) {
+        
+        MTL::CaptureManager *captureManager = MTL::CaptureManager::sharedCaptureManager();
+        MTL::CaptureDescriptor *captureDescriptor = MTL::CaptureDescriptor::alloc();
+        captureDescriptor->init();
+        captureDescriptor->setCaptureObject(device);
+        captureDescriptor->setDestination(MTL::CaptureDestination::CaptureDestinationGPUTraceDocument);
+        const NS::String *filePath = NS::String::string(GPU_TRACE_PATH, NS::StringEncoding::UTF8StringEncoding);
+        captureDescriptor->setOutputURL(NS::URL::fileURLWithPath(filePath));
+        
+        error = nullptr;
+        
+        captureManager->startCapture(captureDescriptor, &error);
+        
+        if (error) {
+            std::cerr << "Error starting capture: "
+            << error->localizedDescription()->utf8String() << std::endl;
+            return -1;
+        }
+    }
     
     auto commandBuffer = commandQueue->commandBuffer();
     auto computeEncoder = commandBuffer->computeCommandEncoder();
@@ -107,18 +128,34 @@ int main2() {
     
     commandBuffer->waitUntilCompleted();
     
+    
+    if (SHOULD_CAPTURE) {
+        captureManager->stopCapture();
+    }
+    
     auto stop = high_resolution_clock::now();
     
     auto elapsed = stop - start;
     
-    std::cout << format_num(MAX_SEED) << " seeds in " << static_cast<double>(duration_cast<milliseconds>(elapsed).count()) / 1000 << " seconds" << std::endl;;
-    std::cout << format_num((uint64_t)((double) MAX_SEED / duration<double>(elapsed).count())) << " seeds/s or " << std::fixed << std::setprecision(4) << (double) duration_cast<nanoseconds>(elapsed).count() / MAX_SEED << " ns per seed" << std::endl;;
+    uint64_t seedsScanned = MAX_SEED;
+    
+    std::cout << "Stats:" << std::endl;
+    
+    std::cout << formatNum(seedsScanned) << " seeds scanned in " << std::fixed << std::setprecision(4) << (double) duration_cast<microseconds>(elapsed).count() / 1000.0 << "ms" << std::endl;
+    
+    std::cout << formatNum(((double) seedsScanned / ((double) duration_cast<microseconds>(elapsed).count() / (1000.0 * 1000.0)))) << " seeds/s" << std::endl;
+    
+    std::cout << formatNum((uint64_t) ((double) seedsScanned / ((double) duration_cast<microseconds>(elapsed).count() / (1000.0 * 1000.0 * 3600.0)))) << " seeds/h" << std::endl;
+    
+    std::cout << std::fixed << std::setprecision(4) << ((double) duration_cast<nanoseconds>(elapsed).count() / (double) seedsScanned) << "ns per seed" << std::endl;
+    
+    std::cout << std::fixed << std::setprecision(4) << std::pow(2.0, 48.0) / (((double) seedsScanned / ((double) duration_cast<microseconds>(elapsed).count() / (1000.0 * 1000.0 * 3600.0)))) << " hours for checking all seeds" << std::endl;
     
     uint64_t *resultData = static_cast<uint64_t *>(resultBuffer->contents());
     
-    std::cout << resultData[0] << " " << resultData[1] << std::endl;;
-    
-    
+    if (resultData[1]) {
+        std::cout << "Found seed: " << resultData[0] << std::endl;
+    }
     
     resultBuffer->release();
     computeEncoder->release();

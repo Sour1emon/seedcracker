@@ -1,5 +1,5 @@
 //
-//  test.metal
+//  find_seed.metal
 //  seedcracker
 //
 //  Created by Isaac Bess on 12/23/24.
@@ -9,16 +9,9 @@
 
 using namespace metal;
 
-constant int32_t BURIED_TREASURE_SALT = 10387320;
-constant int32_t BURIED_TREASURE_DECORATOR_SALT = 30001;
+typedef unsigned char uchar;
 
-constant int32_t CHUNK_X = -28;
-constant int32_t CHUNK_Z = -73;
-
-//
-// RANDOM NUMBER GENERATOR
-//
-// Linear Congruential Generator (LCG)
+// https://en.wikipedia.org/wiki/Linear_congruential_generator
 
 // Multiplier
 constant uint64_t JAVA_LCG_MULTIPLIER = 0x5deece66d;
@@ -26,34 +19,41 @@ constant uint64_t JAVA_LCG_MULTIPLIER = 0x5deece66d;
 // Addend
 constant uint64_t JAVA_LCG_ADDEND = 0xb;
 
-// Modulus
-constant int64_t MASK_48 = (int64_t)((1ULL << 48) - 1);
+// Modulus (probably should be (1 << 48))
+constant uint64_t MASK_48 = (1ULL << 48) - 1;
 
-static inline void setSeed(thread uint64_t *seed, uint64_t value)
+constant uint64_t BURIED_TREASURE_SALT = 10387320;
+constant uint64_t BURIED_TREASURE_DECORATOR_SALT = 30001;
+
+constant int32_t CHUNK_X = -28;
+constant int32_t CHUNK_Z = -73;
+
+static void setSeed(thread uint64_t *seed, uint64_t value)
 {
     *seed = (value ^ JAVA_LCG_MULTIPLIER) & MASK_48;
 }
 
-static inline int32_t next(thread uint64_t *seed, const int32_t bits)
+static inline int next(thread uint64_t *seed, const int bits)
 {
-    *seed = (*seed * JAVA_LCG_MULTIPLIER + JAVA_LCG_ADDEND) & MASK_48;
-    return (int32_t) (*seed >> (48 - bits));
+    uint64_t new_seed = (*seed * JAVA_LCG_MULTIPLIER + JAVA_LCG_ADDEND) & MASK_48;
+    *seed = new_seed;
+    return (int) ((int64_t) new_seed >> (48 - bits));
 }
 
-static inline bool nextBool(thread uint64_t *seed) {
+static bool nextBool(thread uint64_t *seed) {
     return next(seed, 1) == 1;
 }
 
-static inline int32_t nextInt(thread uint64_t *seed, const int32_t n)
+static inline int nextInt(thread uint64_t *seed, const int n)
 {
-    int32_t bits, val;
-    const int32_t m = n - 1;
-    
+    int bits, val;
+    const int m = n - 1;
+
     if ((m & n) == 0) {
         uint64_t x = n * (uint64_t)next(seed, 31);
-        return (int32_t) ((int64_t) x >> 31);
+        return (int) ((int64_t) x >> 31);
     }
-    
+
     do {
         bits = next(seed, 31);
         val = bits % n;
@@ -62,44 +62,47 @@ static inline int32_t nextInt(thread uint64_t *seed, const int32_t n)
     return val;
 }
 
-static inline uint64_t nextLong(thread uint64_t *seed)
+static uint64_t nextLong(thread uint64_t *seed)
 {
-    return (((uint64_t) next(seed, 32)) << 32) + (uint64_t) next(seed, 32);
+    return ((uint64_t) next(seed, 32) << 32) + next(seed, 32);
 }
 
-static inline float nextFloat(thread uint64_t *seed)
+static float nextFloat(thread uint64_t *seed)
 {
     return next(seed, 24) / (float) (1 << 24);
 }
 
-uint64_t inline getPopulationSeed(uint64_t worldSeed, int32_t x, int32_t z) {
+uint64_t getPopulationSeed(uint64_t worldSeed, int x, int z) {
     uint64_t seed;
     setSeed(&seed, worldSeed);
-    int64_t a = nextLong(&seed) | 1;
-    int64_t b = nextLong(&seed) | 1;
     
-    seed = (((int64_t) x * a) + ((int64_t) z * b)) ^ worldSeed;
-    return seed & MASK_48;
+    uint64_t a = nextLong(&seed);
+    uint64_t b = nextLong(&seed);
+    
+    a |= 1;
+    b |= 1;
+    
+    return (x * a + z * b) ^ worldSeed;
 }
 
-uint64_t inline getDecoratorSeed(uint64_t worldSeed, int32_t x, int32_t z, int32_t salt) {
+uint64_t getDecoratorSeed(uint64_t worldSeed, int32_t x, int32_t z, int32_t salt) {
     uint64_t seed = getPopulationSeed(worldSeed, x, z);
     setSeed(&seed, seed + (uint64_t) salt);
     return seed & MASK_48;
 }
 
-//
-// HELPER FUNCTIONS
-//
-
 bool canGenerateTreasure(uint64_t seed) {
-    uint64_t s = CHUNK_X * 341873128712ULL + CHUNK_Z * 132897987541ULL + BURIED_TREASURE_SALT + seed;
+    uint64_t s = ((uint64_t) CHUNK_X * 341873128712 + (uint64_t) CHUNK_Z * 132897987541 + BURIED_TREASURE_SALT + seed);
     setSeed(&s, s);
-    return nextFloat(&s) < 0.01;
+    return next(&seed, 24) < 167773;
 }
 
 int getCount(thread uint64_t *seed, int32_t min, int32_t max) {
-    return nextInt(seed, max - min + 1) + min;
+    if (min >= max) {
+        return min;
+    } else {
+        return nextInt(seed, max - min + 1) + min;
+    }
 }
 
 enum Item: char {
@@ -117,9 +120,10 @@ enum Item: char {
     EMPTY,
 };
 
-struct ItemStack {
+struct alignas(4) ItemStack {
     Item item;
     char count;
+    char padding[2];
 };
 
 constant ItemStack TARGET_LOOT[27] = {
@@ -197,11 +201,11 @@ bool isTargetLoot(ItemStack loot[27]) {
     return true;
 }
 
-template <typename T>
+template <typename T, int MaxSize = 27>
 class InventoryVec {
 public:
+    T contents[MaxSize];
     char len;
-    T contents[27];
     
     void inline push(T item) {
         contents[len] = item;
@@ -227,12 +231,12 @@ public:
     }
     
     void shuffle(thread uint64_t *seed) {
-        for (char i = len; i > 1; i--) {
-            char index = (char) nextInt(seed, i);
-            T tmp = contents[i - 1];
-            contents[i - 1] = contents[index];
-            contents[index] = tmp;
-        }
+        for (uchar i = len - 1; i > 0; --i) {
+                uchar j = nextInt(seed, i + 1);
+                T temp = contents[i];
+                contents[i] = contents[j];
+                contents[j] = temp;
+            }
     }
     
     void extendArray(InventoryVec other, char offset = 0) {
@@ -258,12 +262,12 @@ public:
     }
 };
 
-bool shuffleChest(uint64_t seed, InventoryVec<ItemStack> loot, device uint64_t *resultBuffer) {
+bool shuffleChest(uint64_t seed, InventoryVec<ItemStack> loot) {
     InventoryVec<char> container = {
-        27,
         {
             0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26
-        }
+        },
+        27
     };
     
     container.shuffle(&seed);
@@ -318,19 +322,17 @@ bool shuffleChest(uint64_t seed, InventoryVec<ItemStack> loot, device uint64_t *
 
 #define PUSH_ITEM(ITEM, COUNT) loot.push({ ITEM, COUNT });
 
-bool isCorrectLoot(uint64_t structureSeed, device uint64_t *result) {
-    
+
+bool isCorrectLoot(uint64_t structureSeed) {
     uint64_t seed = getDecoratorSeed(structureSeed, CHUNK_X * 16, CHUNK_Z * 16,
                                      BURIED_TREASURE_DECORATOR_SALT);
     
     // Loot seed
     setSeed(&seed, nextLong(&seed));
     
-    result[1] = seed;
-    
     InventoryVec<ItemStack> loot = {
+        { {HEART_OF_THE_SEA, 1} },
         1,
-        { {HEART_OF_THE_SEA, 1} }
     };
     
     char rolls = getCount(&seed, 5, 8);
@@ -398,6 +400,7 @@ bool isCorrectLoot(uint64_t structureSeed, device uint64_t *result) {
     if ((LEATHER_CHESTPLATE_COUNT != 0 || IRON_SWORD_COUNT != 0) != shouldRoll) {
         return false;
     }
+    
     if (shouldRoll) {
         char weight = nextInt(&seed, 2);
         if (weight < 1) {
@@ -427,19 +430,18 @@ bool isCorrectLoot(uint64_t structureSeed, device uint64_t *result) {
         }
     }
     
-    if (cookedCodCount != COOKED_COD_COUNT && cookedSalmonCount != COOKED_SALMON_COUNT) {
+    if (cookedCodCount != COOKED_COD_COUNT || cookedSalmonCount != COOKED_SALMON_COUNT) {
         return false;
     }
     
-    return shuffleChest(seed, loot, result);
+    return shuffleChest(seed, loot);
 }
 
-bool inline checkSeed(uint64_t seed, device uint64_t *result) {
+bool inline checkSeed(uint64_t seed) {
     if (!canGenerateTreasure(seed)) {
         return false;
     }
-    result[0] = 1;
-    return isCorrectLoot(seed, result);
+    return isCorrectLoot(seed);
 }
 
 // 13574107339664782187ul
@@ -453,24 +455,13 @@ void find_seed(
                 uint tid [[thread_position_in_grid]],
                 uint threads_per_grid [[threads_per_grid]])
 {
-    //result[0] = checkSeed(seed, result);
-    //result[1] = nextLong(&seed);
-    if (tid == 1) {
-        result[0] = 0;
-        result[1] = 0;
-        uint64_t seed = 13574107339664782187ul;
-        checkSeed(seed, result);
-        *exit_flag = false;
-    } else {
-        return;
+    for (uint64_t lower48 = tid; lower48 <= MAX_SEED; lower48 += threads_per_grid) {
+        uint64_t seed = lower48 + 13574107339664782187ul - MAX_SEED + 1;
+        if (checkSeed(seed)) {
+            result[0] = seed;
+            result[1]++;
+            *exit_flag = true;
+            return;
+        }
     }
-    
-//    for (uint64_t lower48 = tid; lower48 < MAX_SEED - threads_per_grid; lower48 += threads_per_grid) {
-//        if (checkSeed(lower48 + 13574107339664782187ul - MAX_SEED + 1, result) && !(*exit_flag)) {
-//            result[0] = lower48 + 1;
-//            result[1]++;
-//            *exit_flag = true;
-//            break;
-//        }
-//    }
 }

@@ -12,10 +12,9 @@
 #include <stdint.h>
 #include <algorithm>
 #include "rng.hpp"
-#include "cubiomes/finders.h"
+#include "finders.h"
 
 typedef unsigned char uchar;
-
 enum Item: uchar {
     NUL = 0,
     EMPTY = 1,
@@ -84,18 +83,17 @@ constexpr uchar getItemCount(Item item) {
     return count;
 }
 
-#define COUNT_ITEMS(ITEM) const uchar ITEM##_COUNT = getItemCount(ITEM);
 
-COUNT_ITEMS(IRON_INGOT);
-COUNT_ITEMS(GOLD_INGOT);
-COUNT_ITEMS(TNT);
-COUNT_ITEMS(EMERALD);
-COUNT_ITEMS(DIAMOND);
-COUNT_ITEMS(PRISMARINE);
-COUNT_ITEMS(LEATHER_CHESTPLATE);
-COUNT_ITEMS(IRON_SWORD);
-COUNT_ITEMS(COOKED_COD);
-COUNT_ITEMS(COOKED_SALMON);
+#define IRON_INGOT_COUNT          getItemCount(IRON_INGOT)
+#define GOLD_INGOT_COUNT          getItemCount(GOLD_INGOT)
+#define TNT_COUNT                 getItemCount(TNT)
+#define EMERALD_COUNT             getItemCount(EMERALD)
+#define DIAMOND_COUNT             getItemCount(DIAMOND)
+#define PRISMARINE_COUNT          getItemCount(PRISMARINE)
+#define LEATHER_CHESTPLATE_COUNT  getItemCount(LEATHER_CHESTPLATE)
+#define IRON_SWORD_COUNT          getItemCount(IRON_SWORD)
+#define COOKED_COD_COUNT          getItemCount(COOKED_COD)
+#define COOKED_SALMON_COUNT       getItemCount(COOKED_SALMON)
 
 #define CHECK_COUNT(ITEM)   \
 if (ITEM##_COUNT == 0) {    \
@@ -358,13 +356,15 @@ bool isCorrectLoot(int64_t structureSeed, const int32_t chunk_x, const int32_t c
     return shuffleChest(seed, loot);
 }
 
-bool inline checkSeed(int64_t seed, Generator *g, const int32_t chunk_x, const int32_t chunk_z) {
+bool inline checkSeed(int64_t seed, const int32_t chunk_x, const int32_t chunk_z) {
     if (!canGenerateTreasure(seed, chunk_x, chunk_z)) {
         return false;
     }
+    
     if (isCorrectLoot(seed, chunk_x, chunk_z)) {
-        applySeed(g, DIM_OVERWORLD, seed);
-        return isViableStructurePos(Treasure, g, chunk_x * 16 + 9, chunk_z * 16 + 9, 0);
+//        applySeed(g, DIM_OVERWORLD, seed);
+//        return isViableStructurePos(Treasure, g, chunk_x * 16 + 9, chunk_z * 16 + 9, 0);
+        return true;
     }
     return false;
 }
